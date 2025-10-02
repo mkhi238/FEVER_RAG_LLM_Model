@@ -1,0 +1,44 @@
+# FEVER Fact-Checking System with RAG
+
+An end-to-end fact-checking pipeline using Retrieval-Augmented Generation (RAG) to verify claims against a 17.1M sentence Wikipedia corpus. Combines FAISS dense retrieval with a fine-tuned DeBERTa-v3 verifier model.
+
+## Overview
+
+This system verifies factual claims by:
+1. Retrieving relevant evidence from Wikipedia using dense vector search (FAISS)
+2. Scoring and filtering evidence based on claim-type patterns 
+3. Classifying claims as TRUE, FALSE, or NOT ENOUGH INFO using a neural verifier (deBERTa-v3)
+
+Built for the FEVER (Fact Extraction and VERification) dataset with modifications for real-world claim types.
+
+## Architecture
+Input Claim - FAISS Retriever (BGE embeddings) - Evidence Quality Scoring (pattern-based filters, using claim type, similarity scores, e.t.c) - DeBERTa-v3 Verifier
+↓
+Prediction: TRUE/FALSE/NOT ENOUGH INFO
+
+## Features
+
+- Dense Retrieval: FAISS indexing with BGE embeddings for semantic search across 17.1M sentences
+- Pattern-Based Filtering: Claim-type detection (authorship, temporal, comparative, geographic) for evidence relevance, along with line similariy scoring and penalization based on sentence text
+- FastAPI service with health monitoring and structured request/response
+- MLflow integration for hyperparameter evaluation and metrics logging
+
+## Installation
+
+1. Clone the repository
+2. Create venv
+3. Install dependancies (requirements.txt)
+4. Download required data (FEVER dataset, Pre-trained BGE embeddings, Wikipedia corpus; all found from HuggingFace FEVER dataset or downloadable)
+
+Usage:
+Training verifier: python src/rag/Verifier/train.py
+Building FAISS Index: python src/rag/Retriever/build_index.py
+Running inference: 
+from test_rag import fact_check
+claim = "Tokyo is the capital of Japan"
+prediction, response = fact_check(claim)
+print(f"{prediction}: {response}")
+Starting the API: 
+cd api
+uvicorn main:app --reload
+The API will be available at http://localhost:8000
