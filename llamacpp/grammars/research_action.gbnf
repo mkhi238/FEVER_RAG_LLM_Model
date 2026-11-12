@@ -1,0 +1,16 @@
+# Research agent action grammar  (YOU: write the rules below)
+#
+# Goal (ClaimScan plan): every agent turn must be exactly one of
+#     search("<query>")
+#     stop
+# so the LangGraph inner loop can parse the action without retries.
+#
+# Spec to implement:
+#   - root is one action, nothing before or after it (no prose, no thinking text)
+#   - query: 1..200 printable chars, no double quote or newline inside
+#   - optional: allow `stop` to carry a short reason later, e.g. stop("enough evidence")
+#
+# References: /mnt/e/llm/llama.cpp/grammars/README.md (syntax), json.gbnf / list.gbnf (examples)
+# Test: llama-cli -m <agent.gguf> --grammar-file llamacpp/grammars/research_action.gbnf -p "..."
+
+root ::= "TODO"

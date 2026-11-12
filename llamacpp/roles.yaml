@@ -1,0 +1,37 @@
+# One entry per LLM role (ClaimScan plan: "one config per LLM role").
+# backend: llamacpp -> started by llamacpp/scripts/serve.sh, reached at http://127.0.0.1:<port>/v1
+# backend: hosted   -> base_url + model + the API key read from env var api_key_env (never write keys here)
+# Model filenames are TODO until Step 2 of llamacpp/README.md.
+
+llama_server: /mnt/e/llm/llama.cpp/build/bin/llama-server
+models_dir: /mnt/e/llm/models
+
+roles:
+  research_agent:
+    backend: llamacpp
+    model: TODO-Qwen3-4B-Q4_K_M.gguf
+    port: 8081
+    ctx: 8192
+    n_gpu_layers: 99
+    grammar: llamacpp/grammars/research_action.gbnf
+    lora: null            # SFT adapter later
+
+  reranker:
+    backend: llamacpp
+    model: TODO-Qwen3-Reranker-0.6B-Q8_0.gguf
+    port: 8082
+    ctx: 4096
+    n_gpu_layers: 99
+    reranking: true
+
+  front_facer:
+    backend: hosted       # 30B-A3B MoE needs ~16 GB free RAM; this machine has 15 GB total
+    base_url: TODO
+    model: TODO
+    api_key_env: CLAIMSCAN_FRONT_API_KEY
+
+  decomposer:
+    backend: hosted       # same model as front_facer, second role (own prompt, JSON output)
+    base_url: TODO
+    model: TODO
+    api_key_env: CLAIMSCAN_FRONT_API_KEY

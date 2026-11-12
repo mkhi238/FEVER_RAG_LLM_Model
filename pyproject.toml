@@ -17,3 +17,5 @@ include = ["claimscan*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+# In-memory capture: pytest's default tmpfile capture fails on the WSL D:/E: (drvfs) mounts.
+addopts = "--capture=sys"
