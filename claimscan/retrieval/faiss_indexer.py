@@ -31,8 +31,8 @@ def get_files(embedding_dir,  max_shards = MAX_SHARDS):
 
   return embedding_files, docid_files
 
-def create_index(num_clusters = NUM_CLUSTERS):
-  index = faiss.IndexIVFFlat(faiss.IndexFlatIP(DIM), DIM, num_clusters)
+def create_index(num_clusters = NUM_CLUSTERS, dim = DIM):
+  index = faiss.IndexIVFFlat(faiss.IndexFlatIP(dim), dim, num_clusters)
   print(f"Created IndexIVFFlat with {num_clusters} clusters")
   return index
 
@@ -102,14 +102,19 @@ def save_index_and_docids(index, docids, output_dir):
   print(f"  Index: {index_path}")
   print(f"  DocIDs: {docids_path}")
 
-def main():
+def main(index_name=None):
+  # index_name picks an entry from dense_indexes in configs/default.yaml (default: bge_small,
+  # i.e. the original EMBEDDING_DIR / DIM above). Run: python -m claimscan.retrieval.faiss_indexer --index minilm
+  entry = config.dense_index(index_name)
+  EMBEDDING_DIR, DIM = entry["dir"], entry["dim"]
+
   start_time = time.perf_counter()
-  
+
   print("Finding shard files...")
   embedding_files, docid_files = get_files(embedding_dir=EMBEDDING_DIR)
 
   print("\nCreating FAISS index...")
-  index = create_index()
+  index = create_index(dim=DIM)
 
   print("\nProcessing all shards (training + adding in single pass)...")
   all_docids = process_shards(index, embedding_files, docid_files, training_sample_size = TRAINING_SAMPLE_SIZE)
@@ -123,4 +128,7 @@ def main():
   print(f"Built index for {len(all_docids):,} documents")
 
 if __name__ == "__main__":
-    main()
+    import argparse
+    parser = argparse.ArgumentParser(description="Build an IVFFlat FAISS index from one dense index's embedding shards")
+    parser.add_argument("--index", default=None, choices=sorted(config.dense_indexes), help="default: bge_small")
+    main(parser.parse_args().index)

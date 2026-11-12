@@ -27,6 +27,25 @@ retriever:
   docids_file: all_docids_175.csv
   nprobe: 64
 
+# Every dense FAISS index under artifacts_root/dense. faiss_embeddings.py and faiss_indexer.py
+# build any of them with --index <name>; the retriever above uses bge_small.
+# State on D: (2026-11-11): bge_small and minilm have 253 shards + faiss_index_175.bin;
+# e5_base has shards 1-56 only (shard 0 missing, no index built).
+dense_indexes:
+  bge_small:
+    model: BAAI/bge-small-en-v1.5
+    dir: dense/faiss_bge_small_en_v1_5
+    dim: 384
+  minilm:
+    model: sentence-transformers/all-MiniLM-L6-v2
+    dir: dense/faiss_all_minilm_l6_v2
+    dim: 384
+  e5_base:
+    model: intfloat/e5-base-v2
+    dir: dense/faiss_e5_base_v2
+    dim: 768
+default_dense_index: bge_small
+
 verifier:
   model: microsoft/deberta-v3-base
   batch_size: 8

@@ -46,10 +46,14 @@ archive/           old TF-IDF / BM25 / HNSW experiments (not imported)
 ## Installation
 
 ```bash
-git clone https://github.com/mkhi238/FEVER_RAG_LLM_Model.git && cd FEVER_RAG_LLM_Model
-python3 -m venv .venv
-.venv/bin/pip install -r requirements.txt
-.venv/bin/pip install --no-deps -e .
+# Everything on D: (see "Location" below)
+cd /mnt/d && git clone https://github.com/mkhi238/FEVER_RAG_LLM_Model.git && cd FEVER_RAG_LLM_Model
+git config core.fileMode false          # NTFS can't store exec bits
+export UV_PYTHON_INSTALL_DIR=/mnt/d/uv/python UV_CACHE_DIR=/mnt/d/uv/cache TMPDIR=/mnt/d/uv/tmp UV_LINK_MODE=copy
+uv python install 3.12
+uv venv --python 3.12 .venv
+uv pip install --python .venv/bin/python -r requirements.txt pytest httpx
+uv pip install --python .venv/bin/python --no-deps -e .
 .venv/bin/python -m pytest
 ```
 
@@ -60,10 +64,24 @@ Data, FAISS indexes and the verifier checkpoint stay outside the repo, under `ar
 | Path (under artifacts_root) | What | Built by |
 |---|---|---|
 | `data/processed/fever_{claims,corpus,evidence}_parquet`, `fever_gold.json` | FEVER claims, corpus, gold evidence | `python -m claimscan.data.unify` |
-| `dense/faiss_bge_small_en_v1_5/embeddings_shard_*.npy` | bge-small sentence embeddings | `python -m claimscan.retrieval.faiss_embeddings` |
-| `dense/faiss_bge_small_en_v1_5/faiss_index_175.bin` | IVFFlat index, 4096 lists, **26 GB** | `python -m claimscan.retrieval.faiss_indexer` |
+| `dense/<index dir>/embeddings_shard_*.npy` | sentence embeddings | `python -m claimscan.retrieval.faiss_embeddings --index <name>` |
+| `dense/<index dir>/faiss_index_175.bin` | IVFFlat index, 4096 lists (bge: **26 GB**) | `python -m claimscan.retrieval.faiss_indexer --index <name>` |
 | `verifier/deberta_v1/training_data.json/training_data.json` | verifier training pairs | `python -m claimscan.verifier.prepare` |
 | `verifier/deberta_v1/trained_model/model.pt` | DeBERTa-v3-base verifier | `python -m claimscan.verifier.train` |
+
+### Dense indexes
+
+The FAISS index builders are `claimscan/retrieval/faiss_embeddings.py` (corpus to embedding shards) and `claimscan/retrieval/faiss_indexer.py` (shards to IVFFlat index). These are the only FAISS builders in this project. `archive/build_hnsw_ann_indexer.py` builds hnswlib indexes, not FAISS. Both scripts take `--index`, which picks an entry from `dense_indexes` in `configs/default.yaml`:
+
+| `--index` | Model | Dir under `dense/` | Dim | State on D: |
+|---|---|---|---|---|
+| `bge_small` (default, used by the retriever) | BAAI/bge-small-en-v1.5 | `faiss_bge_small_en_v1_5` | 384 | 253 shards + index |
+| `minilm` | sentence-transformers/all-MiniLM-L6-v2 | `faiss_all_minilm_l6_v2` | 384 | 253 shards + index |
+| `e5_base` | intfloat/e5-base-v2 | `faiss_e5_base_v2` | 768 | shards 1–56 only, no index |
+
+## Location
+
+The repo, its `.venv`, the Python interpreter (`/mnt/d/uv/python`), the uv cache, the artifacts and the HF cache are all on D:. Nothing in the project lives on C:. WSL's own disk (`~`) sits on C:, so don't clone or create a venv under `~`. If you need a temp folder, use `TMPDIR=/mnt/d/uv/tmp`.
 
 ## Usage
 

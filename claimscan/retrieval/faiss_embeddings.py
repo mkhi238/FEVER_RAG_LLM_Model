@@ -17,7 +17,12 @@ BATCH_SIZE = 2048
 SHARD_SIZE = 100000
 
 
-def main():
+def main(index_name=None):
+  # index_name picks an entry from dense_indexes in configs/default.yaml (default: bge_small,
+  # i.e. the original MODEL / OUTDIR above). Run: python -m claimscan.retrieval.faiss_embeddings --index e5_base
+  entry = config.dense_index(index_name)
+  MODEL, OUTDIR = entry["model"], entry["dir"]
+
   # (moved from module level so importing this file doesn't crash without a GPU)
   print(torch.cuda.is_available())
   print(torch.cuda.device_count())
@@ -107,4 +112,7 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    import argparse
+    parser = argparse.ArgumentParser(description="Embed the FEVER corpus into .npy shards for one dense index")
+    parser.add_argument("--index", default=None, choices=sorted(config.dense_indexes), help="default: bge_small")
+    main(parser.parse_args().index)

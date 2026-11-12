@@ -63,9 +63,19 @@ class ClaimScanConfig:
     "NOT ENOUGH INFO": 2,
   })
 
+  # name -> {"model": str, "dir": Path, "dim": int}; see dense_indexes in default.yaml
+  dense_indexes: dict = field(default_factory=dict)
+  default_dense_index: str = "bge_small"
+
   @property
   def verifier_checkpoint(self) -> Path:
     return self.verifier_output_dir / "trained_model" / "model.pt"
+
+  def dense_index(self, name: str | None = None) -> dict:
+    name = name or self.default_dense_index
+    if name not in self.dense_indexes:
+      raise KeyError(f"Unknown dense index {name!r}; choose from {sorted(self.dense_indexes)}")
+    return self.dense_indexes[name]
 
 
 def load_config(path: str | os.PathLike | None = None) -> ClaimScanConfig:
@@ -105,6 +115,11 @@ def load_config(path: str | os.PathLike | None = None) -> ClaimScanConfig:
     num_labels=int(v["num_labels"]),
     mlflow_experiment_name=raw["mlflow_experiment_name"],
     mlflow_tracking_uri=str(p["mlflow_tracking_uri"]),
+    dense_indexes={
+      name: {"model": d["model"], "dir": root / d["dir"], "dim": int(d["dim"])}
+      for name, d in raw.get("dense_indexes", {}).items()
+    },
+    default_dense_index=raw.get("default_dense_index", "bge_small"),
   )
 
   # Must happen before transformers / sentence_transformers are imported.
