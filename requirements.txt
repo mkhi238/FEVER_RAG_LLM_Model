@@ -1,19 +1,39 @@
-# ClaimScan direct dependencies. The previous file was a 226-line Windows pip freeze
-# (pywin32, pywinpty, ...) that could not install on Linux.
-torch
-transformers
-sentencepiece
-sentence-transformers
-faiss-cpu
-numpy
-pandas
-pyarrow
-datasets
-scikit-learn
-matplotlib
-tqdm
-mlflow
-fastapi
-uvicorn
-pydantic
-pyyaml
+# ClaimScan direct dependencies. Lower bounds = versions verified in .venv (2026-11-12);
+# upper bounds only where a major release is known to change behaviour.
+# Dev/test extras (pytest) live in pyproject.toml: pip install -e ".[dev]"
+
+# --- models / ML
+torch>=2.14                     # .venv has the cu126 build (RTX 2060, sm_75)
+transformers>=5.22,<6           # 5.x loads stored dtype; verifier/model.py casts DeBERTa back to fp32
+sentencepiece>=0.2.3
+sentence-transformers>=6.3,<7
+scikit-learn>=1.9.1
+
+# --- retrieval
+faiss-cpu>=1.16
+pyserini>=2.4,<3                # BM25 (Lucene); needs Java 21
+
+# --- data
+numpy>=2.5
+pandas>=3.1,<4
+pyarrow>=26.0
+datasets>=5.2
+
+# --- LLM orchestration (front facer / decomposer / agent graph)
+langchain>=1.5,<2
+langchain-core>=1.8,<2
+langchain-openai>=1.7,<2        # ChatOpenAI talks to any OpenAI-compatible API (hosted or llama-server /v1)
+langgraph>=1.2,<2
+httpx>=0.28                     # LLM role client; also needed by FastAPI's TestClient
+
+# --- evaluation
+evaluate>=0.4.6                 # loads the vendored FEVER metric (claimscan/eval/metrics/fever)
+
+# --- serving / tracking / utils
+fastapi>=0.162
+uvicorn>=0.54
+pydantic>=2.14,<3
+mlflow>=3.18
+matplotlib>=3.11
+tqdm>=4.70
+pyyaml>=6.0

@@ -2,7 +2,7 @@
 
 ## What this is
 A FEVER fact-checker (FAISS bge-small retrieval → heuristic evidence scoring → DeBERTa-v3 verifier)
-being turned into **ClaimScan (RAG + RL)**. Plan PDF: `C:\Users\mukun\Downloads\claimscan-plan-summary.pdf`.
+being turned into **ClaimScan (RAG + RL)**. Plan PDF: `claimscan-plan-summary.pdf` in the repo root (untracked, not committed; dated Oct 12, 2026, so some parts are stale).
 The plan: front facer + decomposer LLM → LangGraph per-claim loop (research agent Qwen3-4B on llama.cpp
 → retrieve → rerank → DeBERTa verify, max 3 hops). Only the research agent gets trained (LoRA SFT, then GRPO
 after Dec 22). The verifier is frozen and used as the reward. Branch `refactor` = setup/cleanup only; no plan features are built yet.
@@ -18,7 +18,7 @@ after Dec 22). The verifier is frozen and used as the reward. Branch `refactor` 
 ## Run
 ```bash
 source .venv/bin/activate && source scripts/env.sh
-python -m pytest -q             # 41 tests, ~2.5 min (D: is slow over WSL drvfs)
+python -m pytest -q             # slow: D: is WSL drvfs
 python scripts/verifier_smoke.py
 ```
 - pytest uses `--capture=sys` (pyproject). The default tmpfile capture breaks on drvfs.
@@ -32,26 +32,28 @@ python scripts/verifier_smoke.py
 - The user wants plans shown before big changes. Keep retrieval/scoring/decision logic unchanged unless asked.
 - Commit only files you changed (the user may have uncommitted edits).
 
-## Open jobs (requested, not started)
-1. **Hybrid BM25 + FAISS retriever:** reuse existing code, don't rewrite.
-   - BM25: `archive/bm25_sentence_retriever.py` (pyserini/Lucene, returns `{id,line,score}` like FAISS) and
-     `archive/bm25_page_constructor.py` (sentence JSONL with title boost; fix its C: paths).
-   - The RRF hybrid (k=60) exists only on C: at `C:\Users\mukun\crisis-claim-analysis\src\rag\archive\hybrid_retriever\`.
-     It's unfinished (imports a missing `fever_v2.bm25_retriever`; last line is a broken `np.argsort`). Copy and finish it.
-   - **The Lucene index no longer exists**, so it has to be rebuilt: pyserini + Java 21 (installed), 25.2M-sentence JSONL (~5 GB)
-     + index (~5 GB), 1–3 h. Put it on D:. Ask the user before starting the build.
-   - FAISS works locally with `faiss.read_index(path, faiss.IO_FLAG_MMAP)`: 0.85 GB RAM, ~0.1 s warm query,
-     ~25 s first query. Add this to `claimscan/retrieval/faiss_retriever.py`.
-   - Compare BM25 / FAISS / hybrid with `claimscan/retrieval/eval_recall.py` (recall@k).
-2. **Notes folder:** move the user's long learning comments/docstrings out of the code into `notes/`
-   (one markdown per topic, each linking to the code it explains), then leave short, clear comments in the code.
-   Ask whether `notes/` should be committed or kept outside the repo.
+## Open jobs
+1. **Hybrid BM25 + FAISS retriever (RRF k=60): code done and Lucene index built (2026-11-12).**
+   - Lucene index BUILT 2026-11-12: 25,246,092 docs, 4.3 GB, 23 min (`-Xmx2g`, `--memory-buffer 512`; the 4 GB default OOMs).
+     Cold BM25+RM3 queries take 6–11 s. Remaining: compare recall@k, check whether RM3 helps, decide on the `retriever.kind` default.
+   - The stored bge FAISS index is **L2** (lower = better; `scoring.py`'s 1/(score+e) relies on it). Hybrid `score` = 1/rrf to match.
+     But `faiss_indexer.py` builds `IndexFlatIP`, so a rebuild would flip the score direction.
+2. Learning notes moved out of the code to `notes/ml_notes.txt`; ask before committing `notes/`.
 3. **Per-file check:** make every file run, be efficient for 15 GB RAM / 6 GB VRAM, and be clear. Known issues:
-   - `evidence/select.py` `get_evidence` scans all 25M corpus rows per hit → index the corpus by (id, line).
-   - `verifier/prepare.py` does the same full scan per claim (75k claims).
+   - `verifier/prepare.py` scans all 25M corpus rows per claim (75k claims); use `evidence.select.index_corpus`.
    - Loads the full corpus (~4 GB) and the 17.1M docid list (~1.5 GB) into RAM.
+4. **Next (when the user's RL training is off the machine):** `python -m claimscan.eval.eval_retriever --retriever faiss bm25 hybrid`,
+   then `python -m claimscan.eval.fever_eval --max-claims 200`; then fix line-0 in `verifier/prepare.py` and retrain.
+   `claimscan/instruct/` (front decomposer / rear aggregator, LangChain) is the user's; help only if asked.
+
+## Eval (`claimscan/eval/`, 2026-11-12)
+- `metrics/fever/` = the user's FEVER metric from huggingface/evaluate PR #710 (merged), vendored unchanged and loaded with
+  `evaluate.load(<dir>)`. The adapter adds the official conventions: Page#line ids, first 5 predicted sentences, NEI gold = [[]].
+  The later RLVR reward for the agent should import from here (per-claim compute() gives a 0/1 FEVER score).
 
 ## Known data/model issues (for the plan)
+- **FEVER line 0 is stored as -1** (HF loader, falsy 0) in the evidence parquet and fever_gold.json: 46% of gold pairs.
+  `eval/gold.py` fixes it; `verifier/prepare.py` does NOT, so verifier training lost that evidence (retrain candidate).
 - FAISS indexes cover only shards 0–174 of 253 (17.1M of 25.2M sentences). The corpus is sorted by title
   (bge index ends at `Panel_of_Chairs#1`), and the training shards 0–3 were never added.
 - The verifier's 94–95% figure came from an unshuffled split. It says NEI 0.995 on "Obama was born in Hawaii".

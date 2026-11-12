@@ -2,7 +2,7 @@
 
 An end-to-end fact-checking pipeline using Retrieval-Augmented Generation (RAG) to verify claims against a 17.1M sentence Wikipedia corpus. Combines FAISS dense retrieval with a fine-tuned DeBERTa-v3 verifier model.
 
-This is the base for **ClaimScan** (RAG + RL): a LangGraph research agent, reranker, LoRA SFT and GRPO. Those parts are not built yet. Their packages exist as empty slots (`claimscan/agents`, `graph`, `rerank`, `serve`).
+This is the base for **ClaimScan** (RAG + RL): a LangGraph research agent, reranker, LoRA SFT and GRPO. Those parts are not built yet. Their packages exist as empty slots (`claimscan/agents`, `graph`, `rerank`, `serve`). The local LLM serving layer (llama.cpp, one config per LLM role) is scaffolded under `llamacpp/` and `claimscan/llm/`; see [llamacpp/README.md](llamacpp/README.md).
 
 ## Overview
 
@@ -31,28 +31,33 @@ Prediction: TRUE/FALSE/NOT ENOUGH INFO
 claimscan/
   config.py        single config root (reads configs/default.yaml)
   data/            build FEVER claims / evidence / corpus parquet + gold map
-  retrieval/       FAISS retriever, embedding + index builders, recall@k eval
+  retrieval/       FAISS + BM25 (Lucene) retrievers, RRF hybrid, index builders
+  eval/            recall@k per retriever, end-to-end FEVER metric (vendored from HF evaluate PR #710)
   evidence/        scoring.py (claim-type heuristics), select.py (get_evidence)
   verifier/        DeBERTa model, training-data prep, training
   pipeline.py      load_services(), fact_check(), fact_check_cleaned()
   api/             FastAPI service (to be replaced by LangServe)
+  llm/client.py    per-role LLM client skeleton (llama.cpp or hosted), driven by llamacpp/roles.yaml
   agents/ graph/ rerank/ serve/   empty, filled by the ClaimScan plan
 configs/default.yaml
-scripts/           verifier_smoke, retriever_smoke, rag_demo, run_experiments, check_label_balance
+llamacpp/          llama.cpp build/serve scripts, roles.yaml, agent GBNF grammar (see its README)
+scripts/           verifier_smoke, retriever_smoke, rag_demo, run_experiments, check_label_balance, env.sh
 tests/
 archive/           old TF-IDF / BM25 / HNSW experiments (not imported)
 ```
 
 ## Installation
 
+System prerequisite: **Java 21 JDK** for pyserini (BM25/Lucene). pip can't install it. `java -version` should report 21. On Ubuntu/WSL: `sudo apt install openjdk-21-jdk-headless`. Everything else comes from `requirements.txt`.
+
 ```bash
 # Everything on D: (see "Location" below)
 cd /mnt/d && git clone https://github.com/mkhi238/FEVER_RAG_LLM_Model.git && cd FEVER_RAG_LLM_Model
 git config core.fileMode false          # NTFS can't store exec bits
-export UV_PYTHON_INSTALL_DIR=/mnt/d/uv/python UV_CACHE_DIR=/mnt/d/uv/cache TMPDIR=/mnt/d/uv/tmp UV_LINK_MODE=copy
+source scripts/env.sh                   # uv/pip/torch caches, temp and tools on D:/E:
 uv python install 3.12
 uv venv --python 3.12 .venv
-uv pip install --python .venv/bin/python -r requirements.txt pytest httpx
+uv pip install --python .venv/bin/python -r requirements.txt pytest
 uv pip install --python .venv/bin/python --no-deps -e .
 .venv/bin/python -m pytest
 ```
@@ -66,6 +71,7 @@ Data, FAISS indexes and the verifier checkpoint stay outside the repo, under `ar
 | `data/processed/fever_{claims,corpus,evidence}_parquet`, `fever_gold.json` | FEVER claims, corpus, gold evidence | `python -m claimscan.data.unify` |
 | `dense/<index dir>/embeddings_shard_*.npy` | sentence embeddings | `python -m claimscan.retrieval.faiss_embeddings --index <name>` |
 | `dense/<index dir>/faiss_index_175.bin` | IVFFlat index, 4096 lists (bge: **26 GB**) | `python -m claimscan.retrieval.faiss_indexer --index <name>` |
+| `sparse/bm25_sentences/{jsonl,index}` | sentence-level Lucene BM25 index, 25.2M sentences (~10 GB, 1–3 h) | `python -m claimscan.retrieval.bm25_index` |
 | `verifier/deberta_v1/training_data.json/training_data.json` | verifier training pairs | `python -m claimscan.verifier.prepare` |
 | `verifier/deberta_v1/trained_model/model.pt` | DeBERTa-v3-base verifier | `python -m claimscan.verifier.train` |
 
@@ -79,16 +85,21 @@ The FAISS index builders are `claimscan/retrieval/faiss_embeddings.py` (corpus t
 | `minilm` | sentence-transformers/all-MiniLM-L6-v2 | `faiss_all_minilm_l6_v2` | 384 | 253 shards + index |
 | `e5_base` | intfloat/e5-base-v2 | `faiss_e5_base_v2` | 768 | shards 1–56 only, no index |
 
+### Hybrid retrieval
+
+`retriever.kind` in `configs/default.yaml` picks what `load_services()` builds: `faiss` (default), `bm25` or `hybrid`. The hybrid fuses FAISS and BM25 with reciprocal rank fusion (`hybrid.rrf_k: 60`, 100 candidates from each). BM25 covers all 25.2M sentences, while FAISS covers 17.1M. `retriever.mmap: true` memory-maps the FAISS index, so it needs about 1 GB of RAM instead of 26 GB. The catch is that cold queries are slow on D: until the page cache warms up.
+
 ## Location
 
-The repo, its `.venv`, the Python interpreter (`/mnt/d/uv/python`), the uv cache, the artifacts and the HF cache are all on D:. Nothing in the project lives on C:. WSL's own disk (`~`) sits on C:, so don't clone or create a venv under `~`. If you need a temp folder, use `TMPDIR=/mnt/d/uv/tmp`.
+The repo, its `.venv`, the Python interpreter (`/mnt/d/uv/python`), the uv cache, the artifacts and the HF cache are all on D:. Nothing in the project lives on C:. WSL's own disk (`~`) sits on C:, so don't clone or create a venv under `~`. `source scripts/env.sh` sets the uv, pip and torch caches and `TMPDIR` to D:, and puts tools (cmake, llama.cpp) on E: under `/mnt/e/llm`. Add those lines to `~/.bashrc` to make them permanent. Pytest runs with `--capture=sys` because the default tmpfile capture fails on the drvfs mounts.
 
 ## Usage
 
 ```bash
 python scripts/verifier_smoke.py          # verifier only; runs on 16 GB RAM
 python scripts/rag_demo.py                # full pipeline; needs RAM for the 26 GB index
-python -m claimscan.retrieval.eval_recall # recall@k on FEVER dev
+python -m claimscan.eval.eval_retriever --retriever faiss bm25 hybrid   # recall@k on FEVER dev
+python -m claimscan.eval.fever_eval --max-claims 200     # label accuracy, FEVER score, evidence P/R/F1
 python scripts/run_experiments.py         # k / threshold sweep logged to MLflow
 uvicorn claimscan.api.main:app            # POST /fact-check {"claim": "..."}, GET /health
 ```
@@ -103,6 +114,8 @@ prediction, response = fact_check("Tokyo is the capital of Japan", services)
 
 ## Known limits
 
-- The FAISS index is a 26 GB uncompressed `IndexIVFFlat`, so it doesn't fit on a 16 GB machine. The ClaimScan plan rebuilds it in compressed form.
+- **FEVER line 0 is stored as -1** in our evidence parquet and `fever_gold.json`: the HF `fever` loader turns the falsy 0 into -1. That covers 46% of gold pairs. `claimscan/eval/gold.py` maps -1 to 0, so recall@k from before Nov 12, 2026 is too low. `verifier/prepare.py` still looks up line -1 and drops that evidence from verifier training data.
+
+- The FAISS index is a 26 GB uncompressed `IndexIVFFlat` (L2 metric), so it doesn't fit in RAM on a 16 GB machine. Use `retriever.mmap` instead. The ClaimScan plan rebuilds it in compressed form.
 - The verifier's 94–95% validation accuracy came from an unshuffled split. It returns NEI with high confidence on some easy supported claims (see `scripts/verifier_smoke.py`). The plan re-evaluates it.
 - `fact_check` uses k=30 and a 0.5 confidence floor. The API uses k=10 and 0.55.
