@@ -37,6 +37,16 @@ class ClaimScanConfig:
   retriever_index_file: str
   retriever_docids_file: str
   retriever_nprobe: int
+  retriever_mmap: bool
+  retriever_kind: str
+
+  # sparse + hybrid retrieval
+  bm25_dir: Path
+  bm25_k1: float
+  bm25_b: float
+  bm25_rm3: bool
+  hybrid_rrf_k: int
+  hybrid_candidates: int
 
   # verifier
   verifier_model: str
@@ -68,6 +78,14 @@ class ClaimScanConfig:
   default_dense_index: str = "bge_small"
 
   @property
+  def bm25_index_dir(self) -> Path:
+    return self.bm25_dir / "index"
+
+  @property
+  def bm25_jsonl_dir(self) -> Path:
+    return self.bm25_dir / "jsonl"
+
+  @property
   def verifier_checkpoint(self) -> Path:
     return self.verifier_output_dir / "trained_model" / "model.pt"
 
@@ -86,6 +104,7 @@ def load_config(path: str | os.PathLike | None = None) -> ClaimScanConfig:
   root = Path(os.environ.get("CLAIMSCAN_ARTIFACTS", raw["artifacts_root"])).expanduser()
   p = {k: root / v for k, v in raw["paths"].items()}
   r, v = raw["retriever"], raw["verifier"]
+  bm25, hybrid = raw.get("bm25") or {}, raw.get("hybrid") or {}
   hf_home = raw.get("hf_home")
 
   cfg = ClaimScanConfig(
@@ -101,6 +120,14 @@ def load_config(path: str | os.PathLike | None = None) -> ClaimScanConfig:
     retriever_index_file=r["index_file"],
     retriever_docids_file=r["docids_file"],
     retriever_nprobe=int(r["nprobe"]),
+    retriever_mmap=bool(r.get("mmap", False)),
+    retriever_kind=str(r.get("kind", "faiss")),
+    bm25_dir=root / bm25.get("dir", "sparse/bm25_sentences"),
+    bm25_k1=float(bm25.get("k1", 1.2)),
+    bm25_b=float(bm25.get("b", 0.4)),
+    bm25_rm3=bool(bm25.get("rm3", True)),
+    hybrid_rrf_k=int(hybrid.get("rrf_k", 60)),
+    hybrid_candidates=int(hybrid.get("candidates", 100)),
     verifier_model=v["model"],
     verifier_output_dir=p["verifier_output_dir"],
     verifier_training_data=p["verifier_training_data"],

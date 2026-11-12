@@ -8,7 +8,7 @@ from sentence_transformers import SentenceTransformer
 MODEL_NAME = "BAAI/bge-small-en-v1.5"
 
 class FAISSRetriever:
-  def __init__(self, index_dir, model_name = MODEL_NAME, index_file = "faiss_index_175.bin", docids_file = "all_docids_175.csv", nprobe = 64):
+  def __init__(self, index_dir, model_name = MODEL_NAME, index_file = "faiss_index_175.bin", docids_file = "all_docids_175.csv", nprobe = 64, mmap = False):
     self.index_dir = Path(index_dir)
     self.model_name = model_name
 
@@ -19,8 +19,9 @@ class FAISSRetriever:
     if not index_path.exists():
       raise FileNotFoundError(f"Faiss Index Does Not Exist in {index_path}")
     
-    print(f"Loading FAISS index from {index_path}")
-    self.index = faiss.read_index(str(index_path))
+    print(f"Loading FAISS index from {index_path}{' (mmap)' if mmap else ''}")
+    # mmap: the 26 GB bge index then needs ~0.85 GB RAM; the OS pages lists in on demand
+    self.index = faiss.read_index(str(index_path), faiss.IO_FLAG_MMAP if mmap else 0)
 
     # Set search parameters for IVF index
     if hasattr(self.index, 'nprobe'):

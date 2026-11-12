@@ -26,6 +26,25 @@ retriever:
   index_file: faiss_index_175.bin
   docids_file: all_docids_175.csv
   nprobe: 64
+  # Memory-map the index instead of loading it: ~0.85 GB RAM instead of 26 GB.
+  # First query ~25 s (page cache warm-up), then ~0.1 s.
+  mmap: true
+  # Which retriever load_services() builds: faiss | hybrid  (bm25 alone is for recall evals:
+  # its scores are higher = better, while evidence scoring expects FAISS L2 distances)
+  kind: faiss
+
+# Sentence-level BM25 (pyserini/Lucene) over the full 25.2M-sentence corpus.
+# Build: python -m claimscan.retrieval.bm25_index   (jsonl/ ~5 GB + index/ ~5 GB under dir)
+bm25:
+  dir: sparse/bm25_sentences
+  k1: 1.2
+  b: 0.4
+  rm3: true            # RM3 query expansion; needs the index built with docvectors (the builder does this)
+
+# Reciprocal rank fusion of FAISS + BM25: score = sum over retrievers of 1 / (rrf_k + rank)
+hybrid:
+  rrf_k: 60
+  candidates: 100      # hits taken from each retriever before fusing
 
 # Every dense FAISS index under artifacts_root/dense. faiss_embeddings.py and faiss_indexer.py
 # build any of them with --index <name>; the retriever above uses bge_small.
