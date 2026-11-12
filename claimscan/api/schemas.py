@@ -2,7 +2,8 @@ from pydantic import BaseModel
 #Pydantic models define the structure and types of data your API expects and returns.
 
 #Define the data that is coming into the API
-class ClaimsRequest(BaseModel):
+#(was named ClaimsRequest here while main.py imported ClaimRequest, so the API never started)
+class ClaimRequest(BaseModel):
   claim : str #Incoming request mucst have a string claim field
 #FastAPI will validate checks if "claim" field exists, check if it is a str, reject if validation fails or pass Python object if it passes
 
@@ -11,9 +12,9 @@ class ClaimsRequest(BaseModel):
 #this data will be in the JSON form
 #FastAPI validates incoming data (rejects bad requests)
 #Document your API automatically (showing the format to use)
-#Type-check your code (preventing bugs) 
+#Type-check your code (preventing bugs)
 class FactCheckResponse(BaseModel):
-  claim: str 
+  claim: str
   prediction: str
   response: str
   confidence: float

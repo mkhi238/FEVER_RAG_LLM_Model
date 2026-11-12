@@ -1,69 +1,146 @@
+"""Single config root for ClaimScan.
+
+Values come from ``configs/default.yaml`` (or the file named by ``CLAIMSCAN_CONFIG``).
+``CLAIMSCAN_ARTIFACTS`` overrides ``artifacts_root``. Importing this module never
+creates directories; scripts that write output create their own.
+
+The attribute names match the old ``rag/Verifier/config.py`` ``VerifierConfig`` so
+existing call sites (``config.corpus``, ``config.verifier_output_dir`` ...) keep working.
+"""
+from __future__ import annotations
+
+import os
+from dataclasses import dataclass, field
 from pathlib import Path
 
-class VerifierConfig():
-  def __init__(self):
-    
-    self.claims_file = Path(r"D:\crisis-claim-analysis\data\processed\fever_claims_parquet")
-    self.gold_file = Path(r"D:\crisis-claim-analysis\data\processed\fever_gold.json")
-    self.corpus = Path(r"D:\crisis-claim-analysis\data\processed\fever_corpus_parquet")
-    self.evidence = Path(r"D:\crisis-claim-analysis\data\processed\fever_evidence_parquet")
+import yaml
 
-    self.retriever_index_dir = Path(r"D:\crisis-claim-analysis\artifacts\dense\faiss_bge_small_en_v1_5")
-    self.retriever_index_dir.mkdir(parents = True, exist_ok = True)
-    self.retriever_model = "BAAI/bge-small-en-v1.5"
+REPO_ROOT = Path(__file__).resolve().parent.parent
+DEFAULT_CONFIG_FILE = REPO_ROOT / "configs" / "default.yaml"
 
-    self.verifier_model = "microsoft/deberta-v3-base"
-    self.verifier_output_dir = Path(r"D:\crisis-claim-analysis\artifacts\verifier\deberta_v1")
-    self.verifier_output_dir.mkdir(parents=True, exist_ok=True)
 
-    self.batch_size: int = 8
-    self.learning_rate: float = 2e-5
-    self.num_epochs: int = 3
-    self.max_length: int = 512
-    self.warmup_steps: int = 500
+@dataclass
+class ClaimScanConfig:
+  artifacts_root: Path
+  hf_home: Path | None
 
-    self.negative_samples_per_claim: int = 1
-    self.max_evidence_sentences: int = 3      
+  # data
+  data_processed: Path
+  claims_file: Path
+  gold_file: Path
+  corpus: Path
+  evidence: Path
 
-    self.eval_batch_size = 32
-    #YES, NO, NEI
-    self.num_labels = 3
-    
+  # retriever
+  retriever_index_dir: Path
+  retriever_model: str
+  retriever_index_file: str
+  retriever_docids_file: str
+  retriever_nprobe: int
 
-    self.label_mapping = {
-          "TRUE": 0,
-          "FALSE": 1,
-          "NOT ENOUGH INFO": 2
-        }
+  # verifier
+  verifier_model: str
+  verifier_output_dir: Path
+  verifier_training_data: Path
+  batch_size: int
+  learning_rate: float
+  num_epochs: int
+  max_length: int
+  warmup_steps: int
+  negative_samples_per_claim: int
+  max_evidence_sentences: int
+  eval_batch_size: int
+  num_labels: int
 
-    self.mlflow_experiment_name = "fever_verifier"
-    self.mlflow_tracking_uri = str(Path(r"D:\crisis-claim-analysis\artifacts\mlruns"))
-    
-config = VerifierConfig()
+  # tracking
+  mlflow_experiment_name: str
+  mlflow_tracking_uri: str
 
-def validate_config():
+  #YES, NO, NEI
+  label_mapping: dict = field(default_factory=lambda: {
+    "TRUE": 0,
+    "FALSE": 1,
+    "NOT ENOUGH INFO": 2,
+  })
+
+  @property
+  def verifier_checkpoint(self) -> Path:
+    return self.verifier_output_dir / "trained_model" / "model.pt"
+
+
+def load_config(path: str | os.PathLike | None = None) -> ClaimScanConfig:
+  path = Path(path or os.environ.get("CLAIMSCAN_CONFIG", DEFAULT_CONFIG_FILE))
+  with open(path, "r", encoding="utf-8") as f:
+    raw = yaml.safe_load(f)
+
+  root = Path(os.environ.get("CLAIMSCAN_ARTIFACTS", raw["artifacts_root"])).expanduser()
+  p = {k: root / v for k, v in raw["paths"].items()}
+  r, v = raw["retriever"], raw["verifier"]
+  hf_home = raw.get("hf_home")
+
+  cfg = ClaimScanConfig(
+    artifacts_root=root,
+    hf_home=Path(hf_home) if hf_home else None,
+    data_processed=p["data_processed"],
+    claims_file=p["claims_file"],
+    gold_file=p["gold_file"],
+    corpus=p["corpus"],
+    evidence=p["evidence"],
+    retriever_index_dir=p["retriever_index_dir"],
+    retriever_model=r["model"],
+    retriever_index_file=r["index_file"],
+    retriever_docids_file=r["docids_file"],
+    retriever_nprobe=int(r["nprobe"]),
+    verifier_model=v["model"],
+    verifier_output_dir=p["verifier_output_dir"],
+    verifier_training_data=p["verifier_training_data"],
+    batch_size=int(v["batch_size"]),
+    learning_rate=float(v["learning_rate"]),
+    num_epochs=int(v["num_epochs"]),
+    max_length=int(v["max_length"]),
+    warmup_steps=int(v["warmup_steps"]),
+    negative_samples_per_claim=int(v["negative_samples_per_claim"]),
+    max_evidence_sentences=int(v["max_evidence_sentences"]),
+    eval_batch_size=int(v["eval_batch_size"]),
+    num_labels=int(v["num_labels"]),
+    mlflow_experiment_name=raw["mlflow_experiment_name"],
+    mlflow_tracking_uri=str(p["mlflow_tracking_uri"]),
+  )
+
+  # Must happen before transformers / sentence_transformers are imported.
+  if cfg.hf_home is not None and "HF_HOME" not in os.environ and cfg.hf_home.is_dir():
+    os.environ["HF_HOME"] = str(cfg.hf_home)
+
+  return cfg
+
+
+config = load_config()
+
+
+def validate_config(cfg: ClaimScanConfig = config):
   required_files = [
-    config.claims_file,
-    config.gold_file,
-    config.corpus,
-    config.evidence
+    cfg.claims_file,
+    cfg.gold_file,
+    cfg.corpus,
+    cfg.evidence,
   ]
 
   required_dirs = [
-    config.retriever_index_dir
+    cfg.retriever_index_dir
   ]
 
   missing_files = [f for f in required_files if not f.exists()]
   missing_dirs = [d for d in required_dirs if not d.exists()]
-    
+
   if missing_files:
       raise FileNotFoundError(f"Missing required files: {missing_files}")
-    
+
   if missing_dirs:
       raise FileNotFoundError(f"Missing required directories: {missing_dirs}")
-  
+
   else:
      print("Configuration Complete")
-                                                          
+
+
 if __name__ == "__main__":
     validate_config()

@@ -1,6 +1,6 @@
 from datasets import load_dataset
 import pandas as pd
-from common import normalize_text
+from claimscan.data.common import normalize_text
 
 def build_corpus():
     wiki_dataset = load_dataset("fever", "wiki_pages", split="wikipedia_pages")

@@ -1,52 +1,13 @@
+"""Sweep retrieval k and confidence threshold over a fixed claim list; log to MLflow.
+Was experiments/run_experiments.py. It used to patch model/retriever/corpus into
+test_rag's globals; it now passes a Services object to fact_check_cleaned.
+"""
 import mlflow
-import sys
-from pathlib import Path
-import torch
-import pandas as pd
-
 import matplotlib.pyplot as plt
 from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
 
-# Add paths
-inference_path = Path(r'C:\Users\mukun\crisis-claim-analysis\src\rag\Inference')
-verifier_dir = Path(r"C:\Users\mukun\crisis-claim-analysis\src\rag\Verifier")
-retriever_dir = Path(r"C:\Users\mukun\crisis-claim-analysis\src\rag\Retriever")
+from claimscan.pipeline import fact_check_cleaned, load_services
 
-sys.path.insert(0, str(inference_path))
-sys.path.insert(0, str(verifier_dir))
-sys.path.insert(0, str(retriever_dir))
-
-# Import everything you need
-from test_rag import fact_check_cleaned
-from DeBERTa_Model import FEVERVerifier
-from faiss_sentence_retriever import FAISSRetriever
-from config import config
-
-# Initialize the global objects that fact_check_cleaned needs
-print("Loading model and retriever...")
-
-# Load model
-model = FEVERVerifier()
-model_path = config.verifier_output_dir / "trained_model" / "model.pt"
-model.load_state_dict(torch.load(model_path))
-model.eval()
-
-# Load retriever
-retriever = FAISSRetriever(config.retriever_index_dir, config.retriever_model)
-
-# Load corpus
-corpus_df = pd.read_parquet(config.corpus)
-
-# Make them available to test_rag module
-import test_rag
-test_rag.model = model
-test_rag.retriever = retriever
-test_rag.corpus_df = corpus_df
-
-print("Loading complete!\n")
-
-mlflow.set_experiment("fever_fact_checking")
-print("completed")
 test_claims = [
     # Clear factual claims
     ("Water boils at 100 degrees Celsius", "TRUE"),
@@ -114,7 +75,7 @@ def run_experiment(k_value, conf_threshold):
     y_true = []
     y_pred = []
     for claim, true_label in test_claims:
-      pred = fact_check_cleaned(claim, k_value, conf_threshold)
+      pred = fact_check_cleaned(claim, services, k_value, conf_threshold)
       pred_counts[pred] += 1
       true_counts[true_label] += 1
       
@@ -163,8 +124,16 @@ def run_experiment(k_value, conf_threshold):
     mlflow.log_artifact(cm_path)
     plt.close()  # Important: free memory
 
-run_experiment(k_value=10, conf_threshold=0.50)
-run_experiment(k_value=30, conf_threshold=0.65)
-run_experiment(k_value=30, conf_threshold=0.50)
-run_experiment(k_value=50, conf_threshold=0.50)
+if __name__ == "__main__":
+  print("Loading model and retriever...")
+  services = load_services()
+  print("Loading complete!\n")
+
+  mlflow.set_experiment("fever_fact_checking")
+  print("completed")
+
+  run_experiment(k_value=10, conf_threshold=0.50)
+  run_experiment(k_value=30, conf_threshold=0.65)
+  run_experiment(k_value=30, conf_threshold=0.50)
+  run_experiment(k_value=50, conf_threshold=0.50)
 

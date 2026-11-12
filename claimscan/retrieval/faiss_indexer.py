@@ -5,7 +5,9 @@ import faiss
 import time
 
 # Configuration
-EMBEDDING_DIR = r"D:\crisis-claim-analysis\artifacts\dense\faiss_bge_small_en_v1_5"
+from claimscan.config import config
+
+EMBEDDING_DIR = config.retriever_index_dir
 DIM = 384  # BGE-small-en-v1.5 embedding dimension
 NUM_CLUSTERS = 4096
 TRAINING_SAMPLE_SIZE = 500000

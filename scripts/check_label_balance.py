@@ -1,12 +1,12 @@
 import json
 from pathlib import Path
 from collections import Counter
-from config import config
+from claimscan.config import config
 
 
 def check_label_balance():
     # Load your training data
-    train_file = config.verifier_output_dir / "training_data.json" / "training_data.json"
+    train_file = config.verifier_training_data
     
     with open(train_file, 'r') as f:
         examples = json.load(f)

@@ -1,6 +1,6 @@
 from datasets import load_dataset
 import pandas as pd
-from common import clean_data
+from claimscan.data.common import clean_data
 
 
 canon = {'false statement': 'FALSE', 

@@ -8,19 +8,22 @@ from sentence_transformers import SentenceTransformer
 #Purpose: Takes your 17M Wikipedia sentences and converts each one into a 384-dimensional vector using BGE model. Saves as .npy files (vectors) and .csv files (document IDs).
 
 
-PARQUET = r"D:\crisis-claim-analysis\data\processed\fever_corpus_parquet"
-OUTDIR = r"D:\crisis-claim-analysis\artifacts\dense\faiss_bge_small_en_v1_5"
-MODEL = "BAAI/bge-small-en-v1.5"
+from claimscan.config import config
+
+PARQUET = config.corpus
+OUTDIR = config.retriever_index_dir
+MODEL = config.retriever_model
 BATCH_SIZE = 2048
 SHARD_SIZE = 100000
 
 
-print(torch.cuda.is_available())   
-print(torch.cuda.device_count())  
-print(torch.cuda.get_device_name(0))  
-
-
 def main():
+  # (moved from module level so importing this file doesn't crash without a GPU)
+  print(torch.cuda.is_available())
+  print(torch.cuda.device_count())
+  if torch.cuda.is_available():
+    print(torch.cuda.get_device_name(0))
+
   outdir = Path(OUTDIR)
   outdir.mkdir(parents=True, exist_ok=True)
 

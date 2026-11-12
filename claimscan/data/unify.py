@@ -1,14 +1,15 @@
 import pandas as pd
 from pathlib import Path
-from common import normalize_text, build_gold_map
-from fever_claim import build_fever_claim
-from fever_evidence import build_fever_evidence
-from fever_wiki_dump import build_corpus
+from claimscan.config import config
+from claimscan.data.common import normalize_text, build_gold_map
+from claimscan.data.fever_claim import build_fever_claim
+from claimscan.data.fever_evidence import build_fever_evidence
+from claimscan.data.fever_wiki_dump import build_corpus
 
-path = Path(r"C:\Users\mukun\crisis-claim-analysis\data\processed")
-path.mkdir(parents=True, exist_ok=True)
+path = config.data_processed
 
 def main():
+  path.mkdir(parents=True, exist_ok=True)
   claims_df = build_fever_claim()
   evidence_df = build_fever_evidence()
   corpus_df = build_corpus()

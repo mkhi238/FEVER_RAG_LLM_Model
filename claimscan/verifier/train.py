@@ -8,8 +8,8 @@ from sklearn.metrics import accuracy_score
 from tqdm import tqdm
 from pathlib import Path
 import matplotlib.pyplot as plt
-from config import config
-from DeBERTa_Model import FEVERVerifier
+from claimscan.config import config
+from claimscan.verifier.model import FEVERVerifier
 
 #the Dataset class is another framework class like nn.Module, but this class needs you to define everything since it does not come with any inherret defined methods
 #The purpose of Dataset is just to allow Pytorch to know that the DatasetLoader is infact a dataset loader, meaning that the class must contain the appropriate functions
@@ -50,7 +50,7 @@ class FEVERDatasetLoader(Dataset):
 #3 epochs to avoid overfit
 
 def train_model():
-  train_file = config.verifier_output_dir / "training_data.json" / "training_data.json"
+  train_file = config.verifier_training_data
 
   with open(train_file, 'r') as f:
     examples = json.load(f)
@@ -188,7 +188,7 @@ def train_model():
   return model
 
 if __name__ == "__main__":
-  train_file = config.verifier_output_dir / "training_data.json"
+  train_file = config.verifier_training_data
 
   if not train_file.exists():
     print(f"Training data not found: {train_file}")

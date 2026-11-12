@@ -1,12 +1,13 @@
-from faiss_sentence_retriever import FAISSRetriever
+"""Load the FAISS index and run a few queries. Needs ~26 GB free RAM for the current IVFFlat index."""
+from claimscan.config import config
+from claimscan.retrieval.faiss_retriever import FAISSRetriever
 
-INDEX_DIR = r"D:\crisis-claim-analysis\artifacts\dense\faiss_bge_small_en_v1_5"
-retriever = FAISSRetriever(INDEX_DIR)
+retriever = FAISSRetriever(config.retriever_index_dir, config.retriever_model)
 
 # Test basic queries
 queries = [
     "What is the capital of France",  # Basic geography
-    "When did World War 2 end?"
+    "When did World War 2 end?",  # comma was missing, which merged this query with the next
     "Was the moon landing real?"
 ]
 

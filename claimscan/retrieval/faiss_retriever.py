@@ -8,13 +8,13 @@ from sentence_transformers import SentenceTransformer
 MODEL_NAME = "BAAI/bge-small-en-v1.5"
 
 class FAISSRetriever:
-  def __init__(self, index_dir, model_name = MODEL_NAME):
+  def __init__(self, index_dir, model_name = MODEL_NAME, index_file = "faiss_index_175.bin", docids_file = "all_docids_175.csv", nprobe = 64):
     self.index_dir = Path(index_dir)
     self.model_name = model_name
 
     self.model = SentenceTransformer(model_name, device = 'cpu')
 
-    index_path = self.index_dir / "faiss_index_175.bin"
+    index_path = self.index_dir / index_file
 
     if not index_path.exists():
       raise FileNotFoundError(f"Faiss Index Does Not Exist in {index_path}")
@@ -24,9 +24,9 @@ class FAISSRetriever:
 
     # Set search parameters for IVF index
     if hasattr(self.index, 'nprobe'):
-      self.index.nprobe = 64  # Search 64 clusters (speed vs accuracy tradeoff)
+      self.index.nprobe = nprobe  # Search 64 clusters by default (speed vs accuracy tradeoff)
 
-    docids_path = self.index_dir / "all_docids_175.csv"
+    docids_path = self.index_dir / docids_file
 
     if not docids_path.exists():
       raise FileNotFoundError(f"Docids Do Not Exist in {docids_path}")

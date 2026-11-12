@@ -1,16 +1,13 @@
 import torch
 import torch.nn as nn
 from transformers import AutoModel, AutoTokenizer
-from pathlib import Path
-import sys
 
 #DeBERTa Model - starts pre-trained on general language understanding, gets fine tuned during training
 #Learns to better represent claim-evidence representations
 
 #Linear classifier starts with random weights and gets fully trained during training from Transformers representation
 
-sys.path.append(str(Path(__file__).parent))
-from config import config
+from claimscan.config import config
 
 
 class FEVERVerifier(nn.Module):
@@ -22,7 +19,9 @@ class FEVERVerifier(nn.Module):
     self.tokenizer = AutoTokenizer.from_pretrained(config.verifier_model)
     #Processes those token IDs → contextualized representations
     #Loads the pre-trained DeBERTa model (the transformer that understands language). This gives you 768-dimensional representations of text.
-    self.deberta = AutoModel.from_pretrained(config.verifier_model)
+    # .float(): transformers>=5 loads in the stored dtype (fp16 for deberta-v3-base); the
+    # verifier was trained and saved in fp32 under transformers 4.x, so keep it fp32.
+    self.deberta = AutoModel.from_pretrained(config.verifier_model).float()
     #Takes DeBERTa's output → final prediction
     #Creates a simple linear layer that converts DeBERTa's 768-dim output → 3 classes (TRUE/FALSE/NOT ENOUGH INFO).
     self.classifier = nn.Linear(self.deberta.config.hidden_size, config.num_labels)

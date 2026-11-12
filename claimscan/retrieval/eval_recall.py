@@ -2,17 +2,18 @@ from pathlib import Path
 import json, time, unicodedata, re
 import numpy as np
 import pandas as pd
-from faiss_sentence_retriever import FAISSRetriever  # Updated import
+from claimscan.config import config
+from claimscan.retrieval.faiss_retriever import FAISSRetriever
 #Emb: Script 1: Wikipedia text → 384-dim vectors (offline, one-time)
 #indexer: Script 2: Vectors → FAISS search index (offline, one-time) -simplifies the search a lot since we no longer need to go into all cluses
 #find cluster centroids, and will then just map to closest centroids
 #Querier: Script 3: Query text → search results (real-time, during training/inference)
 #ok so 1 creates the embs, 2 takes embs and makes centroids, 3 actually converts a sentence into a  vector and maps to ac entroid
 # --------- PATHS ----------
-CLAIMS_DIR = Path(r"D:\crisis-claim-analysis\data\processed\fever_claims_parquet")
-GOLD_PATH  = Path(r"D:\crisis-claim-analysis\data\processed\fever_gold.json")
-INDEX_DIR = Path(r"D:\crisis-claim-analysis\artifacts\dense\faiss_bge_small_en_v1_5")  # BGE path
-MODEL_NAME = "BAAI/bge-small-en-v1.5"  # BGE model
+CLAIMS_DIR = config.claims_file
+GOLD_PATH  = config.gold_file
+INDEX_DIR = config.retriever_index_dir  # BGE path
+MODEL_NAME = config.retriever_model  # BGE model
 # --------------------------
 
 # --------- KNOBS ----------

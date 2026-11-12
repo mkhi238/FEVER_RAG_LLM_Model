@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "claimscan"
+version = "0.1.0"
+description = "Claim verification over FEVER Wikipedia: FAISS retrieval + DeBERTa verifier (RAG + RL build)"
+requires-python = ">=3.10"
+dynamic = ["dependencies"]
+
+[tool.setuptools.dynamic]
+dependencies = { file = ["requirements.txt"] }
+
+[tool.setuptools.packages.find]
+include = ["claimscan*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

@@ -5,21 +5,14 @@ import re
 from pathlib import Path
 import pandas as pd
 from tqdm import tqdm
-import sys
 import tempfile
 import shutil
 import os
 
 #Creates model training data 
 
-sys.path.append(str(Path(__file__).parent))
-retriever_dir = Path(r"C:\Users\mukun\crisis-claim-analysis\src\rag\Retriever")
-verifier_dir = Path(r"C:\Users\mukun\crisis-claim-analysis\src\rag\Verifier")
-sys.path.insert(0, str(retriever_dir))
-sys.path.insert(0, str(verifier_dir))
-
-from faiss_sentence_retriever import FAISSRetriever
-from config import config
+from claimscan.retrieval.faiss_retriever import FAISSRetriever
+from claimscan.config import config
 
 def norm_title(s):
 
