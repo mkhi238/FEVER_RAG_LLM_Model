@@ -12,6 +12,12 @@ MODULES = [
   "claimscan.data.unify",
   "claimscan.evidence.scoring",
   "claimscan.evidence.select",
+  "claimscan.retrieval.hybrid_retriever",
+  "claimscan.retrieval.bm25_retriever",
+  "claimscan.retrieval.bm25_index",
+  "claimscan.eval",
+  "claimscan.eval.gold",
+  "claimscan.eval.fever_eval",
   "claimscan.verifier.model",
   "claimscan.verifier.train",
   "claimscan.pipeline",
@@ -27,7 +33,7 @@ NEEDS_FAISS = [
   "claimscan.retrieval.faiss_retriever",
   "claimscan.retrieval.faiss_indexer",
   "claimscan.retrieval.faiss_embeddings",
-  "claimscan.retrieval.eval_recall",
+  "claimscan.eval.eval_retriever",
   "claimscan.verifier.prepare",
 ]
 

@@ -22,7 +22,7 @@ LABEL_MAP = {0: "TRUE", 1: "FALSE", 2: "NOT ENOUGH INFO"}
 @dataclass
 class Services:
   model: FEVERVerifier
-  retriever: "FAISSRetriever"
+  retriever: "FAISSRetriever | BM25Retriever | HybridRetriever"
   corpus_df: pd.DataFrame
 
 
@@ -34,16 +34,28 @@ def load_verifier(cfg: ClaimScanConfig = config) -> FEVERVerifier:
   return model
 
 
-def load_retriever(cfg: ClaimScanConfig = config):
-  # imported here so the verifier can be used without faiss / sentence-transformers installed
-  from claimscan.retrieval.faiss_retriever import FAISSRetriever
-  return FAISSRetriever(
-    cfg.retriever_index_dir,
-    cfg.retriever_model,
-    index_file=cfg.retriever_index_file,
-    docids_file=cfg.retriever_docids_file,
-    nprobe=cfg.retriever_nprobe,
-  )
+def load_retriever(cfg: ClaimScanConfig = config, kind: str | None = None):
+  """Build the retriever named by ``kind`` (default ``cfg.retriever_kind``): faiss | bm25 | hybrid."""
+  kind = kind or cfg.retriever_kind
+  # imported here so the verifier can be used without faiss / sentence-transformers / pyserini installed
+  if kind == "faiss":
+    from claimscan.retrieval.faiss_retriever import FAISSRetriever
+    return FAISSRetriever(
+      cfg.retriever_index_dir,
+      cfg.retriever_model,
+      index_file=cfg.retriever_index_file,
+      docids_file=cfg.retriever_docids_file,
+      nprobe=cfg.retriever_nprobe,
+      mmap=cfg.retriever_mmap,
+    )
+  if kind == "bm25":
+    from claimscan.retrieval.bm25_retriever import BM25Retriever
+    return BM25Retriever(cfg.bm25_index_dir, cfg.bm25_k1, cfg.bm25_b, cfg.bm25_rm3)
+  if kind == "hybrid":
+    from claimscan.retrieval.hybrid_retriever import HybridRetriever
+    return HybridRetriever(load_retriever(cfg, "faiss"), load_retriever(cfg, "bm25"),
+                           rrf_k=cfg.hybrid_rrf_k, candidates=cfg.hybrid_candidates)
+  raise ValueError(f"Unknown retriever kind {kind!r}; use faiss, bm25 or hybrid")
 
 
 def load_services(cfg: ClaimScanConfig = config) -> Services:
@@ -55,7 +67,6 @@ def load_services(cfg: ClaimScanConfig = config) -> Services:
 
 def verify(model, claim, evidence):
   """Run the verifier on (claim, evidence[:3]). Returns (prediction, probs)."""
-  #.item(): Converts a single-value tensor to a Python number, torch.argmax(logits, dim=1) returns tensor [2], .item returns 2
   encoding = model.encode_text(claim, evidence[:3])
 
   with torch.no_grad():
@@ -102,22 +113,20 @@ def fact_check(claim, services: Services):
   return prediction, response
 
 
-#1. Retrieval: Get k=10 candidates from FAISS
-#2. Quality scoring: Score all 10, sort by quality
-#3. Select top 3: Pick the 3 highest quality pieces
-#4. Model inference: Send those 3 to DeBERTa
 
-#If k=10 and the right evidence is ranked #15 in FAISS, you never see it. Your quality scorer can't pick what it never receives.
-#If k=50 and the right evidence is at #15, your quality scorer gets it, scores it highly, and includes it in the top 3 sent to the model.
+def fact_check_cleaned(claim, services: Services, k=30, conf_threshold=0.5, return_evidence=False):
+    """Fact check without debug prints - for MLflow experiments and claimscan.eval.
 
-
-def fact_check_cleaned(claim, services: Services, k=30, conf_threshold=0.5):
-    """Fact check without debug prints - for MLflow experiments"""
+    With ``return_evidence=True`` returns (prediction, ["Page#line", ...]) for the evidence
+    sentences sent to the verifier; the decision logic is the same either way.
+    """
     evidence_results = services.retriever.search(claim, k=k)
-    evidence = get_evidence(claim, evidence_results, services.corpus_df)
+    picked = get_evidence(claim, evidence_results, services.corpus_df, with_ids=True)
+    evidence = [text for text, _ in picked]
+    evidence_ids = [docid for _, docid in picked]
 
     if not evidence:
-        return "NOT ENOUGH INFO"
+        return ("NOT ENOUGH INFO", []) if return_evidence else "NOT ENOUGH INFO"
 
     prediction, probs = verify(services.model, claim, evidence)
 
@@ -125,4 +134,4 @@ def fact_check_cleaned(claim, services: Services, k=30, conf_threshold=0.5):
     if confidence < conf_threshold and prediction != "NOT ENOUGH INFO":
         prediction = "NOT ENOUGH INFO"
 
-    return prediction
+    return (prediction, evidence_ids) if return_evidence else prediction

@@ -43,3 +43,15 @@ def test_get_evidence_joins_corpus_and_keeps_top3():
   assert len(out) == 3
   assert out[0] == "tokyo is the capital of japan"
   assert "it rains" not in out
+
+
+def test_get_evidence_ids_and_indexed_corpus_match_scan():
+  from claimscan.evidence.select import index_corpus
+  corpus = pd.DataFrame({"id": ["Tokyo", "Tokyo", "Paris"], "line": [0, 1, 0],
+                         "text": ["tokyo is the capital of japan", "tokyo has many trains running", "paris is the capital of france"]})
+  hits = [{"id": "Tokyo", "line": 1, "score": 0.5}, {"id": "Tokyo", "line": 0, "score": 0.5},
+          {"id": "Nope", "line": 0, "score": 0.1}]
+  scanned = get_evidence("tokyo capital japan", hits, corpus, with_ids=True)
+  assert scanned[0] == ("tokyo is the capital of japan", "Tokyo#0") and len(scanned) == 2
+  assert get_evidence("tokyo capital japan", hits, index_corpus(corpus), with_ids=True) == scanned
+  assert get_evidence("tokyo capital japan", hits, corpus) == [t for t, _ in scanned]

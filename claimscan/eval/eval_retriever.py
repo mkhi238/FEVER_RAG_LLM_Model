@@ -1,19 +1,17 @@
-from pathlib import Path
-import json, time, unicodedata, re
-import numpy as np
+"""Recall@k of the retrievers (faiss | bm25 | hybrid) on FEVER validation.
+
+Was claimscan/retrieval/eval_recall.py. Gold now comes from claimscan.eval.gold, which
+fixes FEVER's line-0-stored-as--1 quirk; recall numbers from before that fix are too low.
+
+Run: python -m claimscan.eval.eval_retriever --retriever faiss bm25 hybrid --max-claims 200
+"""
+import time
 import pandas as pd
 from claimscan.config import config
-from claimscan.retrieval.faiss_retriever import FAISSRetriever
-#Emb: Script 1: Wikipedia text → 384-dim vectors (offline, one-time)
-#indexer: Script 2: Vectors → FAISS search index (offline, one-time) -simplifies the search a lot since we no longer need to go into all cluses
-#find cluster centroids, and will then just map to closest centroids
-#Querier: Script 3: Query text → search results (real-time, during training/inference)
-#ok so 1 creates the embs, 2 takes embs and makes centroids, 3 actually converts a sentence into a  vector and maps to ac entroid
+from claimscan.eval.gold import load_claims, load_gold_pairs, norm_title
+from claimscan.pipeline import load_retriever
 # --------- PATHS ----------
-CLAIMS_DIR = config.claims_file
-GOLD_PATH  = config.gold_file
-INDEX_DIR = config.retriever_index_dir  # BGE path
-MODEL_NAME = config.retriever_model  # BGE model
+DOCIDS_PATH = config.retriever_index_dir / config.retriever_docids_file  # FAISS coverage
 # --------------------------
 
 # --------- KNOBS ----------
@@ -21,58 +19,50 @@ K_SENT               = 50      # global top-k to keep
 LOG_EVERY            = 50
 # --------------------------
 
-def norm_title(s: str) -> str:
-    s = unicodedata.normalize("NFKC", str(s)).strip()
-    return re.sub(r"\s+", "_", s)
-
 def load_claims_validation():
     print("[eval] loading claims…")
-    path = CLAIMS_DIR
-    if path.is_dir():
-        files = sorted(path.glob("*.parquet"))
-        if not files:
-            raise FileNotFoundError(f"No .parquet files in {path}")
-        path = files[0]
-        print(f"[eval] using claims file: {path.name}")
-    
-    df = pd.read_parquet(path, columns=["id", "claim", "split"])
-    df["split"] = df["split"].replace({"val": "validation", "labelled_dev": "validation", "paper_test": "test"})
-    df = df[df["split"] == "validation"].copy()
-    df["id"] = df["id"].astype(int)
-    df["claim"] = df["claim"].astype(str)
+    df = load_claims("validation")
     print(f"[eval] validation claims loaded: {len(df):,}")
-    return df.reset_index(drop=True)
+    return df
 
 def load_gold():
     print("[eval] loading gold evidence…")
-    with open(GOLD_PATH, "r", encoding="utf-8") as f:
-        raw = json.load(f)
-    gold_norm = {}
-    for k, pairs in raw.items():
-        k_int = int(k)
-        gold_norm[k_int] = [(norm_title(pid), int(line)) for pid, line in pairs]
-    print(f"[eval] gold entries: {len(gold_norm):,}")
-    return gold_norm
+    gold = load_gold_pairs()
+    print(f"[eval] gold entries: {len(gold):,}")
+    return gold
 
-def eval_recall_faiss(
+def faiss_pages(retr=None):
+    """Pages the FAISS index covers (shards 0-174 only). Every retriever is scored on the
+    claims whose gold pages are in here, so FAISS / BM25 / hybrid numbers are comparable."""
+    docids = getattr(retr, "docids", None) or getattr(getattr(retr, "faiss", None), "docids", None)
+    if docids is None:
+        docids = pd.read_csv(DOCIDS_PATH, usecols=["docid"], dtype=str)["docid"]
+    return {norm_title(doc.rsplit("#", 1)[0]) for doc in docids}
+
+def eval_recall(
+    retriever="faiss",
     k_list=(1,5,10,20),
     k_sent=K_SENT,
     log_every=LOG_EVERY,
-    max_claims=None
+    max_claims=None,
+    faiss_coverage_only=True,
 ):
+    """Recall@k on FEVER validation for retriever = faiss | bm25 | hybrid."""
     t0 = time.perf_counter()
     claims = load_claims_validation()
     gold = load_gold()
 
-    print(f"[eval] initializing FAISS retriever...")
-    retr = FAISSRetriever(index_dir=INDEX_DIR, model_name=MODEL_NAME)
+    print(f"[eval] initializing {retriever} retriever...")
+    retr = load_retriever(config, retriever)
     print("[eval] retriever ready.")
-    
-    # Load available documents from the index
-    print("[eval] loading available documents from index...")
-    available_docs = set(retr.docids)
-    available_pages = {doc.split("#")[0] for doc in available_docs}
-    print(f"[eval] index contains {len(available_pages):,} unique pages")
+
+    if not faiss_coverage_only:
+        available_pages = None
+    else:
+        print("[eval] loading pages covered by the FAISS index...")
+        available_pages = faiss_pages(retr)
+    if available_pages is not None:
+        print(f"[eval] FAISS index covers {len(available_pages):,} unique pages")
     
     # Filter gold to only include claims where evidence exists in our index
     print("[eval] filtering gold evidence to match available documents...")
@@ -85,7 +75,7 @@ def eval_recall_faiss(
         coverage_stats["evidence_total"] += len(pairs)
         
         # Check which evidence pairs exist in our index
-        available_pairs = [(page, line) for page, line in pairs if page in available_pages]
+        available_pairs = [(page, line) for page, line in pairs if available_pages is None or page in available_pages]
         coverage_stats["evidence_found"] += len(available_pairs)
         
         # Keep claim if at least one evidence document is available
@@ -119,7 +109,7 @@ def eval_recall_faiss(
         if not gold_pairs:
             continue
 
-        # Search with FAISS
+        # Search
         t_q = time.perf_counter()
         results = retr.search(q, k=k_sent)
         q_ms = (time.perf_counter() - t_q) * 1000.0
@@ -164,15 +154,31 @@ def eval_recall_faiss(
         print("[eval] No validation claims with gold evidence found.")
         return
 
-    print(f"[eval] Claims evaluated: {total}")
+    print(f"[eval] retriever={retriever}  claims evaluated: {total}")
     for k in k_list:
         print(f"[eval] Recall@{k}: {recalls_any[k] / total:.3f}")
     print(f"[eval] done. total time: {time.perf_counter() - t0:.2f}s")
+    return {k: recalls_any[k] / total for k in k_list}
+
+def eval_recall_faiss(**kwargs):
+    return eval_recall("faiss", **kwargs)
 
 if __name__ == "__main__":
-    eval_recall_faiss(
-        max_claims=200,
-        k_sent=K_SENT,
-        k_list=(1,5,10,20),
-        log_every=LOG_EVERY
-    )
+    import argparse
+    ap = argparse.ArgumentParser(description="Recall@k on FEVER validation")
+    ap.add_argument("--retriever", nargs="+", choices=["faiss", "bm25", "hybrid"], default=["faiss"],
+                    help="one or more; e.g. --retriever faiss bm25 hybrid")
+    ap.add_argument("--max-claims", type=int, default=200)
+    ap.add_argument("--k", type=int, nargs="+", default=[1, 5, 10, 20, 50])
+    ap.add_argument("--all-claims", action="store_true",
+                    help="don't restrict to claims whose gold pages are in the FAISS index")
+    args = ap.parse_args()
+    summary = {}
+    for name in args.retriever:
+        summary[name] = eval_recall(name, k_list=tuple(args.k), k_sent=max(K_SENT, *args.k),
+                                    max_claims=args.max_claims, faiss_coverage_only=not args.all_claims)
+    if len(summary) > 1:
+        print("\n[eval] summary  " + "  ".join(f"R@{k:<4}" for k in args.k))
+        for name, r in summary.items():
+            if r:
+                print(f"[eval] {name:<8} " + "  ".join(f"{r[k]:.3f}" for k in args.k))
