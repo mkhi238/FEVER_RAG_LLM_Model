@@ -6,23 +6,6 @@ import joblib
 from pyserini.search.lucene import LuceneSearcher
 import unicodedata, re
 
-#corpus: This is the full processed FEVER corpus, one row per sentence.
-#Likely has columns like:
-#id (page title)
-#line (sentence number within page) (A line 1, A line 2 ..., B line 1, B line 2 ... etc)
-#text (sentence text)
-#You use this to recover the raw text when outputting results
-
-#meta: This is a lightweight index aligned with your TF-IDF matrix rows.
-#Usually just the metadata needed to map a TF-IDF row back to a (page_id, line) pair.
-#Columns:
-# id (page title)
-# line (sentence number)
-#It’s small, quick to load, and directly aligns with the rows of X = tfidf_matrix.npz.
-
-#meta gives you the lookup: “Row 1234 in the TF-IDF matrix corresponds to page=A, line=1.”
-#corpus lets you fetch the actual text for that (id, line): “He served as a senator...”.
-
 
 
 class PageTFIDFRetriever():
@@ -52,9 +35,6 @@ class PageTFIDFRetriever():
     hits = self.searcher.search(query, k=pages)
     if not hits:
       return []
-    #Page2idx is a dictionairy we built
-    #Maps each page id to an array of row indices in your TF-IDF sentence matrix.
-    #"Obama": np.array([0, 1, 2, 3]),   # sentences from "Obama" page
     candidates = []
     for i in hits:
       #Takes the docid of a BM25 hit (say "Obama").
@@ -70,13 +50,8 @@ class PageTFIDFRetriever():
     if not candidates:
       return []
       
-    #[array([0, 1, 2, 3]), array([100, 101, 102])] > array([0, 1, 2, 3, 100, 101, 102])
     cand_idx = np.concatenate(candidates)
 
-    #self.vectorizer is saved TfidfVectorizer
-    #.transform([query]) applies the same preprocessing + vocabulary + IDF weights that were used to build your corpus matrix.
-    # Input: (a list of strings). 
-    # Output: a sparse row vector of shape (1, vocab_size) where each nonzero entry is the TF-IDF weight of a term from the query.
     qv = self.vectorizer.transform([query]).astype(np.float32, copy = False) # (1, V)
     X_cand = self.X[cand_idx] # (Ncand, V)
     score = (np.dot(qv, X_cand.T)).toarray().ravel() # (Ncand,1)

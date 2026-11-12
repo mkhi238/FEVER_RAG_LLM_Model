@@ -27,19 +27,7 @@ def load_fever_data():
     return df_claims, df_corpus, df_evidence
 
 def get_evidence_text(gold_evidence, corpus_df):
-    #Takes gold evidence (the correct evidence for a claim) and the corpus
-    #For each evidence entry, extracts the Wikipedia page name and sentence number
-    #Looks up that specific sentence in the corpus DataFrame
-    #Returns the actual sentence text
-
-    #match is a filtered DataFrame containing rows from the corpus where both conditions are true: The page ID matches the evidence page, The line number matches the evidence sentence ID
-    #This function converts evidence references (page + line number) into actual readable sentences for training your verifier.
     sentences = []
-    #evidence_df contains gold evidence
-    #id = claim ID (used for grouping all evidence for the same claim)
-    #evidence_annotation_id = Annotation ID - internal FEVER dataset identifier for this specific evidence annotation (uneeded)
-    #evidence_wiki_url = Wikipedia page name (like "Nikolaj_Coster-Waldau")
-    #evidence_sentence_id = Sentence line number on that Wikipedia page (7 = line 7, -1 = whole page/no specific line)
     for _, row in gold_evidence.iterrows():
         wiki_url = norm_title(row['evidence_wiki_url'])
         sentence_id = row['evidence_sentence_id']
@@ -87,10 +75,6 @@ def get_negative_text(claim_text, gold_evidence, corpus_df, retriever):
     
 
 def create_training_data(claims_df, evidence_df, corpus_df, retriver, target_amount_per_class = 2500):
-    # claims_df: Contains claims with columns like id, claim, label_text (TRUE, FALSE, NEI), split
-    # evidence_df: Contains evidence references with id (refers to claim 100), evidence_wiki_url (evidence_wiki_url="Barack_Obama", can have 
-    # multipl for different claims), evidence_sentence_id (the line on the wiki_url)
-    # corpus_df: Contains actual sentence text with id (Obama), line (line on obama page), text (sentence itself)
     train_claims = claims_df[claims_df['split'] == "train"].sample(n=75000, random_state=19)
 
     true_examples = []
@@ -102,7 +86,6 @@ def create_training_data(claims_df, evidence_df, corpus_df, retriver, target_amo
         claim_text = str(row['claim'])
         label = str(row['label_text'])
 
-        #ID is like 'id=100' (refers to claim 100), 
         gold_evidence = evidence_df[evidence_df['id'] == claim_id]
 
         #if there is evidence and evidence is true, collect true evidence 
@@ -112,8 +95,6 @@ def create_training_data(claims_df, evidence_df, corpus_df, retriver, target_amo
                 true_examples.append({
                     "claim_id": claim_id,
                     "claim": claim_text,
-                    #No, multiple pieces of evidence per claim is common in FEVER.
-                    #The function get_evidence_text returns all positive evidence sentences in FEVER evidence (corresponding to corpus)
                     "evidence": sentences[:config.max_evidence_sentences],
                     "label" : label
                 })
@@ -124,8 +105,6 @@ def create_training_data(claims_df, evidence_df, corpus_df, retriver, target_amo
                 false_examples.append({
                     "claim_id": claim_id,
                     "claim": claim_text,
-                    #No, multiple pieces of evidence per claim is common in FEVER.
-                    #The function get_evidence_text returns all positive evidence sentences in FEVER evidence (corresponding to corpus)
                     "evidence": sentences[:config.max_evidence_sentences],
                     "label" : label
                 })
@@ -136,8 +115,6 @@ def create_training_data(claims_df, evidence_df, corpus_df, retriver, target_amo
                 nei_examples.append({
                     "claim_id": claim_id,
                     "claim": claim_text,
-                    #No, multiple pieces of evidence per claim is common in FEVER.
-                    #The function get_evidence_text returns all positive evidence sentences in FEVER evidence (corresponding to corpus)
                     "evidence": neg_sentences[:config.max_evidence_sentences],
                     "label" : "NOT ENOUGH INFO"
                 })
@@ -194,7 +171,3 @@ JSON:
   }
 ]
 '''
-#claim_id is the unique identifier for each claim in the FEVER dataset.
-#claim: The statement to verify
-#evidence: 1-3 sentences that either support, refute, or are irrelevant to the claim
-#label: TRUE (supports), FALSE (refutes), or NOT ENOUGH INFO (irrelevant)

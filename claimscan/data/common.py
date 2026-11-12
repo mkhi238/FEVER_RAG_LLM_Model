@@ -22,8 +22,6 @@ def clean_data(dataset, split_name, canon = None, text_col = "claim", label_col 
     return df
 
 def build_gold_map(df, json_out):
-    #evidence_wiki_url is a name (like Barack Obama)
-    #evidence_sentence_id is a sentence numebr on a page where the evidence is (-1 if it cant be found, numeric otherwise)
     df = df.dropna(subset = ["id", "evidence_wiki_url", "evidence_sentence_id"])
     df["id"] = df["id"].astype(int)
     df["evidence_sentence_id"] = df["evidence_sentence_id"].astype(int)

@@ -20,7 +20,6 @@ async def lifespan(app: FastAPI):
   model_service.load() #loads model
   yield
 
-#Creates your FastAPI application. The title appears in the auto-generated docs at /docs
 app = FastAPI(title = "FEVER Fact Checker API", lifespan = lifespan)
 
 @app.post("/fact-check", response_model = FactCheckResponse)
@@ -66,15 +65,3 @@ async def health():
     return {"status": "healthy", "models_loaded": model_service.is_loaded()}
 
 
-
-#async means the function can be paused and resumed, allowing other work to happen during waiting periods.
-#normal functions are syncrobnous, meaning that the program stops and waits for the function to finish
-#async def get_data() - When it hits async, the function pauses and lets other tasks run. When syncronous finishes, it resumes.
-#async enables concurrency - ability to handle multiple things at once by switching tasks during wait time
-#/fact-check endpoint being async means while one request waits for model inference, another request can start processing
-#async means a function can pause and let other work happen while waiting. So like two functions would run concurrently
-#async needs the await keyword - here async does nothing other than acts as a keyword for FastAPI since there is no await
-
-#when you use async with FastAPI without await, FastAPI uses thread pools (not the async event loop) to achieve concurrency.
-#FastAPI handles the threading automatically. Works well for most ML inference APIs. async just acts as a wrapper, and then allows FastAPI to
-#use thread pools to work

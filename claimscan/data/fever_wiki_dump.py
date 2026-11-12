@@ -27,7 +27,3 @@ def build_corpus():
     corpus = pd.DataFrame(rows, columns = ["id","line","text"]).drop_duplicates(subset = ['id', 'line']).reset_index(drop=True)
 
     return corpus
-
-#id is the wiki page name/title
-#line is the sentence index within the page
-#text is the sentence context

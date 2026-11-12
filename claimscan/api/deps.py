@@ -2,8 +2,6 @@
 from claimscan.config import config
 from claimscan.pipeline import load_services
 
-#dependancy creates a container class which holds and manages the models; sets up a manager to access and load them
-
 
 class ModelService:
   def __init__(self):

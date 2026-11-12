@@ -2,11 +2,6 @@ import torch
 import torch.nn as nn
 from transformers import AutoModel, AutoTokenizer
 
-#DeBERTa Model - starts pre-trained on general language understanding, gets fine tuned during training
-#Learns to better represent claim-evidence representations
-
-#Linear classifier starts with random weights and gets fully trained during training from Transformers representation
-
 from claimscan.config import config
 
 
@@ -14,20 +9,13 @@ class FEVERVerifier(nn.Module):
   def __init__(self):
     super().__init__()
 
-    #Converts text → token IDs that the model can understand
-    #Load the tokenizer that converts text → numbers that DeBERTa can process.
     self.tokenizer = AutoTokenizer.from_pretrained(config.verifier_model)
-    #Processes those token IDs → contextualized representations
-    #Loads the pre-trained DeBERTa model (the transformer that understands language). This gives you 768-dimensional representations of text.
     # .float(): transformers>=5 loads in the stored dtype (fp16 for deberta-v3-base); the
     # verifier was trained and saved in fp32 under transformers 4.x, so keep it fp32.
     self.deberta = AutoModel.from_pretrained(config.verifier_model).float()
-    #Takes DeBERTa's output → final prediction
-    #Creates a simple linear layer that converts DeBERTa's 768-dim output → 3 classes (TRUE/FALSE/NOT ENOUGH INFO).
     self.classifier = nn.Linear(self.deberta.config.hidden_size, config.num_labels)
 
   def forward(self, input_ids, attention_mask):
-    #Runs tokenized text through DeBERTa, gets contextualized representations for every token.
     outputs = self.deberta(input_ids = input_ids, attention_mask = attention_mask)
     cls_output = outputs.last_hidden_state[:,0]
     logits = self.classifier(cls_output)
@@ -45,9 +33,6 @@ class FEVERVerifier(nn.Module):
     return encoding
   
 if __name__ == '__main__':
-  #model automatically calls the forward method
-  #The model ONLY does forward pass:
-  #Takes inputs → runs through layers → returns outputs
   model = FEVERVerifier()
   claim = "Barack Obama was born in Hawaii"
   evidence = ["Barack Obama was born In Honolulu, Hawaii."]
@@ -60,16 +45,3 @@ if __name__ == '__main__':
     print(f"Output shape: {logits.shape}")
     print(f"Predictions: {torch.softmax(logits, dim=1)}")
 
-
-#Note on nn.Module
-#class Module:
-#    def __call__(self, *args):
-#        return self.forward(*args)  # this is automatically imported  
-#    def forward(self):
-#        raise NotImplementedError  # I need to implement forward
-#    def parameters(self):
-#        # Automatically finds all your layers (already implemented function)
-#    def train(self):
-#        # Sets all layers to training mode (already implemented function)
-
-#nn.Module is a framework importer, but you would need to define forward always for this to work

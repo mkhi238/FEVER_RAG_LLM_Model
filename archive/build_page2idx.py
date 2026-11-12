@@ -3,12 +3,6 @@ import pandas as pd
 import numpy as np
 import joblib
 
-#page2idx.joblib (for TF-IDF rerank)
-
-#Format: "Obama" (id) -> np.array([sentence_row_indices])
-#Purpose: map BM25 pages → sentence rows for reranking.
-#Stores: only sentence indices, no text.
-
 tfidf = Path(r"C:\Users\mukun\crisis-claim-analysis\artifacts\tfidf")
 
 def main():

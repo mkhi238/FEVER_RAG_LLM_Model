@@ -93,7 +93,7 @@ def run_experiment(k_value, conf_threshold):
         false_negatives += 1
       
     accuracy = correct/len(test_claims)
-    recall = true_positives / (false_negatives + true_positives) #more important, since we need to know if true claims are bing caught
+    recall = true_positives / (false_negatives + true_positives)
     precision = true_positives / (true_positives + false_positives)
     f1_score = (2 * precision * recall) / (precision + recall)
 

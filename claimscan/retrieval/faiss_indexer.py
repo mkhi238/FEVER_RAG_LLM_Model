@@ -36,7 +36,6 @@ def create_index(num_clusters = NUM_CLUSTERS, dim = DIM):
   print(f"Created IndexIVFFlat with {num_clusters} clusters")
   return index
 
-#we are using IndexIVFFlat now, so we need to train on samples and get clusters
 def process_shards(index, embedding_files, docid_files, training_sample_size = TRAINING_SAMPLE_SIZE):
   print("Collecting training data...")
   training_vectors = []

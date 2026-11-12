@@ -10,10 +10,6 @@ EF_CONSTRUCTION = 200
 EF_SEARCH = 512
 
 
-#emb shard is [#sentences in shard, 384]
-#embeddings_shard_00000.npy → shape (100,000, 384) embeddings_shard_00001.npy → shape (100,000, 384)
-# 2048 rust referred to the GPU mini batch per time, but this amount got appended to the 100 000 total 
-
 def main():
     indir = Path(INDIRECT)
     embdeddings = sorted(indir.glob("embeddings_shard_*.npy"))
@@ -36,7 +32,6 @@ def main():
         assert X.shape[0] == len(ids)
         print(f"Building HNSW for shard {shard_id}: {X.shape[0]:,} vectors")
 
-        #it stores the top 50 of the 512 prio queue, and each vector inserted has 32 connections max of 500 potnetial? and query traverses a path (from prio queue) and find best vectors
         idx = hnswlib.Index(space=SPACE, dim=DIM)
         idx.init_index(max_elements=len(ids), ef_construction=EF_CONSTRUCTION, M=M)
 
@@ -46,6 +41,5 @@ def main():
         pd.Series(ids, name="docid").to_csv(out_labels, index=False)
         print(f"Saved {out_idx.name} and {out_labels.name}")
 
-#it will return something like [0, 17, 532] (internal row indices). You use those numbers to index into ids to recover the actual document ID
 if __name__ == "__main__":
     main()
