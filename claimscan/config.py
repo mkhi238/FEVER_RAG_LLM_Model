@@ -65,6 +65,9 @@ class ClaimScanConfig:
   # tracking
   mlflow_experiment_name: str
   mlflow_tracking_uri: str
+  mlflow_artifact_dir: Path
+  mlflow_retriever_experiment: str
+  eval_dir: Path
 
   #YES, NO, NEI
   label_mapping: dict = field(default_factory=lambda: {
@@ -76,6 +79,19 @@ class ClaimScanConfig:
   # name -> {"model": str, "dir": Path, "dim": int}; see dense_indexes in default.yaml
   dense_indexes: dict = field(default_factory=dict)
   default_dense_index: str = "bge_small"
+
+  # reranker (backend "none" = not used); see rerank: in default.yaml
+  rerank_backend: str = "none"
+  rerank_top_n: int = 10
+  rerank_candidates: int = 100
+  rerank_batch_size: int = 32
+  rerank_device: str = "cpu"
+  rerank_cross_encoder_model: str = "cross-encoder/ms-marco-MiniLM-L-6-v2"
+  rerank_cohere_model: str = "rerank-v3.5"
+  rerank_cohere_base_url: str = "https://api.cohere.com"
+  rerank_openai_model: str = "gpt-5-nano"
+  rerank_openai_base_url: str = "https://api.openai.com/v1"
+  rerank_openai_mode: str = "pointwise"
 
   @property
   def bm25_index_dir(self) -> Path:
@@ -105,6 +121,7 @@ def load_config(path: str | os.PathLike | None = None) -> ClaimScanConfig:
   p = {k: root / v for k, v in raw["paths"].items()}
   r, v = raw["retriever"], raw["verifier"]
   bm25, hybrid = raw.get("bm25") or {}, raw.get("hybrid") or {}
+  rr = raw.get("rerank") or {}
   hf_home = raw.get("hf_home")
 
   cfg = ClaimScanConfig(
@@ -142,11 +159,25 @@ def load_config(path: str | os.PathLike | None = None) -> ClaimScanConfig:
     num_labels=int(v["num_labels"]),
     mlflow_experiment_name=raw["mlflow_experiment_name"],
     mlflow_tracking_uri=str(p["mlflow_tracking_uri"]),
+    mlflow_artifact_dir=p.get("mlflow_artifact_dir", root / "mlflow/artifacts"),
+    mlflow_retriever_experiment=raw.get("mlflow_retriever_experiment", "retriever_eval"),
+    eval_dir=p.get("eval_dir", root / "eval"),
     dense_indexes={
       name: {"model": d["model"], "dir": root / d["dir"], "dim": int(d["dim"])}
       for name, d in raw.get("dense_indexes", {}).items()
     },
     default_dense_index=raw.get("default_dense_index", "bge_small"),
+    rerank_backend=str(rr.get("backend", "none")),
+    rerank_top_n=int(rr.get("top_n", 10)),
+    rerank_candidates=int(rr.get("candidates", 100)),
+    rerank_batch_size=int(rr.get("batch_size", 32)),
+    rerank_device=str(rr.get("device", "cpu")),
+    rerank_cross_encoder_model=str(rr.get("cross_encoder_model", "cross-encoder/ms-marco-MiniLM-L-6-v2")),
+    rerank_cohere_model=str(rr.get("cohere_model", "rerank-v3.5")),
+    rerank_cohere_base_url=str(rr.get("cohere_base_url", "https://api.cohere.com")),
+    rerank_openai_model=str(rr.get("openai_model", "gpt-5-nano")),
+    rerank_openai_base_url=str(rr.get("openai_base_url", "https://api.openai.com/v1")),
+    rerank_openai_mode=str(rr.get("openai_mode", "pointwise")),
   )
 
   # Must happen before transformers / sentence_transformers are imported.

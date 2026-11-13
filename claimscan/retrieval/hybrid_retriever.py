@@ -11,9 +11,9 @@ What changed while finishing it:
   - The final `np.argsort()` (no argument, so it crashed) is a plain sort by fused score.
 
 Results look like FAISSRetriever's: {"id", "line", "score"}, sorted best first. "score"
-follows the FAISS convention, LOWER = better: the stored bge index is L2 (distances), and
-evidence/scoring.py turns it into quality with 1 / (score + e). So score = 1 / rrf_score,
-which keeps that formula ranking the fused hits in RRF order. The raw RRF value is in
+follows the FAISS convention, LOWER = better (the stored bge index is L2 distances), so
+score = 1 / rrf_score. Evidence scoring (claimscan/neurosymbolic_layer/score.py) only uses each
+hit's rank, so the fused hits keep their RRF order there. The raw RRF value is in
 "rrf_score" (higher = better), and faiss_rank / bm25_rank (1-based, None = not retrieved)
 show which retriever found what.
 """

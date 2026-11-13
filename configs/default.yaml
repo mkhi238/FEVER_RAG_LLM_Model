@@ -19,7 +19,10 @@ paths:
   retriever_index_dir: dense/faiss_bge_small_en_v1_5
   verifier_output_dir: verifier/deberta_v1
   verifier_training_data: verifier/deberta_v1/training_data.json/training_data.json
-  mlflow_tracking_uri: mlruns
+  # MLflow 3.x refuses the old ./mlruns file store, and the SQLite DB works on D: (first open ~70 s).
+  mlflow_tracking_uri: mlflow/mlflow.db
+  mlflow_artifact_dir: mlflow/artifacts
+  eval_dir: eval
 
 retriever:
   model: BAAI/bge-small-en-v1.5
@@ -29,8 +32,8 @@ retriever:
   # Memory-map the index instead of loading it: ~0.85 GB RAM instead of 26 GB.
   # First query ~25 s (page cache warm-up), then ~0.1 s.
   mmap: true
-  # Which retriever load_services() builds: faiss | hybrid  (bm25 alone is for recall evals:
-  # its scores are higher = better, while evidence scoring expects FAISS L2 distances)
+  # Which retriever load_services() builds: faiss | bm25 | hybrid  (evidence scoring uses each
+  # hit's rank, not its score, so the bm25/faiss score directions don't matter there)
   kind: faiss
 
 # Sentence-level BM25 (pyserini/Lucene) over the full 25.2M-sentence corpus.
@@ -45,6 +48,23 @@ bm25:
 hybrid:
   rrf_k: 60
   candidates: 100      # hits taken from each retriever before fusing
+
+# Reranker over the retrieved candidates (not wired into pipeline.py yet).
+# backend: none | cross_encoder | cohere | openai | llamacpp
+#   cohere needs env COHERE_API_KEY; openai needs OPENAI_API_KEY (or point openai_base_url at a local chat server);
+#   llamacpp needs claimscan.llm.client.rerank finished. Notes: notes/reranker_research.md
+rerank:
+  backend: none
+  top_n: 10                 # sentences kept after reranking
+  candidates: 100           # retrieved hits fed to the reranker
+  batch_size: 32            # cross_encoder batch / openai parallel requests
+  device: cpu               # cross_encoder only
+  cross_encoder_model: cross-encoder/ms-marco-MiniLM-L-6-v2
+  cohere_model: rerank-v3.5
+  cohere_base_url: https://api.cohere.com
+  openai_model: gpt-5-nano
+  openai_base_url: https://api.openai.com/v1   # or http://localhost:8080/v1 for llama.cpp
+  openai_mode: pointwise    # pointwise | listwise
 
 # Every dense FAISS index under artifacts_root/dense. faiss_embeddings.py and faiss_indexer.py
 # build any of them with --index <name>; the retriever above uses bge_small.
@@ -78,3 +98,12 @@ verifier:
   num_labels: 3
 
 mlflow_experiment_name: fever_verifier
+mlflow_retriever_experiment: retriever_eval
+
+# LIAR (PolitiFact, 6 labels, no evidence): out-of-domain eval + claim pool for the agent.
+# Data: python -m claimscan.data.liar --download  (~10 MB under artifacts_root/liar)
+# label_map: binary | binary_strict | three_way, or an explicit {liar_label: TRUE|FALSE|NOT ENOUGH INFO}
+#   (see claimscan/data/liar.py). Eval: python -m claimscan.eval.liar_eval --max-claims 100
+liar:
+  dir: liar
+  label_map: binary
