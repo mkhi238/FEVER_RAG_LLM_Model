@@ -33,7 +33,8 @@ claimscan/
   data/            build FEVER claims / evidence / corpus parquet + gold map
   retrieval/       FAISS + BM25 (Lucene) retrievers, RRF hybrid, index builders
   eval/            recall@k per retriever, end-to-end FEVER metric (vendored from HF evaluate PR #710)
-  evidence/        scoring.py (claim-type heuristics), select.py (get_evidence)
+  neurosymbolic_layer/  rule layer: text.py (word helpers), rules.py (claim-type heuristics), score.py (rank prior x rules)
+  evidence/        select.py (get_evidence)
   verifier/        DeBERTa model, training-data prep, training
   pipeline.py      load_services(), fact_check(), fact_check_cleaned()
   api/             FastAPI service (to be replaced by LangServe)
@@ -98,11 +99,33 @@ The repo, its `.venv`, the Python interpreter (`/mnt/d/uv/python`), the uv cache
 ```bash
 python scripts/verifier_smoke.py          # verifier only; runs on 16 GB RAM
 python scripts/rag_demo.py                # full pipeline; needs RAM for the 26 GB index
-python -m claimscan.eval.eval_retriever --retriever faiss bm25 hybrid   # recall@k on FEVER dev
-python -m claimscan.eval.fever_eval --max-claims 200     # label accuracy, FEVER score, evidence P/R/F1
+python -m claimscan.eval.benchmark --n 300                # all retrievers: recall/precision/F1, FEVER metric, time -> chart + MLflow
+python -m claimscan.eval.eval_retriever --retriever bm25  # online recall@k, one retriever at a time
+python -m claimscan.eval.fever_eval --max-claims 200     # end-to-end FEVER metric with a live retriever
 python scripts/run_experiments.py         # k / threshold sweep logged to MLflow
 uvicorn claimscan.api.main:app            # POST /fact-check {"claim": "..."}, GET /health
 ```
+
+### Retriever benchmark
+
+`claimscan/eval/benchmark.py` compares `faiss`, `bm25` (RM3), `bm25_norm3`, `hybrid` and `hybrid_norm3` on one sample of FEVER dev claims (a third per label):
+- **Retrieval metrics:** hit@k, recall_set@k (a whole gold evidence set in the top k), recall@k, precision@k, F1@k and MRR.
+- **End-to-end FEVER metric:** label accuracy, FEVER score and evidence P/R/F1, through the unchanged `fact_check_cleaned`.
+- **Wall-clock time** for each stage.
+
+Each retriever runs in its own subprocess, and its hits are cached under `<artifacts>/eval/cache`, so peak RAM stays around 3 GB and reruns are quick. FAISS goes through `claimscan/retrieval/faiss_batch.py`. It reads the 26 GB index once in file order, instead of making 30–120 s cold mmap queries, and returns the same results as `index.search`. Outputs land in `<artifacts>/eval/runs/<timestamp>/`: `summary.md`, `summary.json`, `benchmark.png` and `predictions.parquet`.
+
+### MLflow
+
+Runs go to a SQLite store at `<artifacts>/mlflow/mlflow.db`, with artifacts in `<artifacts>/mlflow/artifacts`. Use `claimscan.tracking.setup_mlflow(...)`. MLflow 3.x refuses the old `./mlruns` file store, and setting `MLFLOW_TRACKING_URI` overrides the store. The benchmark logs to the `retriever_eval` experiment (one parent run plus a nested run per retriever), and `run_experiments.py` logs to `fever_fact_checking`. To browse the runs:
+
+```bash
+mlflow ui --backend-store-uri sqlite:////mnt/d/crisis-claim-analysis/artifacts/mlflow/mlflow.db
+```
+
+### Claude Code agents
+
+`.claude/agents/` has three subagents: `evaluate-retriever` (unit tests, the benchmark, the MLflow check and an interpretation of the chart), `fix-fever` (finds and fixes errors) and `git-commit` (commits the working tree as logical commits).
 
 From Python:
 

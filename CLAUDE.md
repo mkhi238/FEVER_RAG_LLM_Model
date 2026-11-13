@@ -36,7 +36,8 @@ python scripts/verifier_smoke.py
 1. **Hybrid BM25 + FAISS retriever (RRF k=60): code done and Lucene index built (2026-11-12).**
    - Lucene index BUILT 2026-11-12: 25,246,092 docs, 4.3 GB, 23 min (`-Xmx2g`, `--memory-buffer 512`; the 4 GB default OOMs).
      Cold BM25+RM3 queries take 6–11 s. Remaining: compare recall@k, check whether RM3 helps, decide on the `retriever.kind` default.
-   - The stored bge FAISS index is **L2** (lower = better; `scoring.py`'s 1/(score+e) relies on it). Hybrid `score` = 1/rrf to match.
+   - The stored bge FAISS index is **L2** (lower = better). Hybrid `score` = 1/rrf to match. Evidence scoring now uses rank, not score
+     (`claimscan/neurosymbolic_layer/`, which replaced `evidence/scoring.py` on 2026-11-12).
      But `faiss_indexer.py` builds `IndexFlatIP`, so a rebuild would flip the score direction.
 2. Learning notes moved out of the code to `notes/ml_notes.txt`; ask before committing `notes/`.
 3. **Per-file check:** make every file run, be efficient for 15 GB RAM / 6 GB VRAM, and be clear. Known issues:
