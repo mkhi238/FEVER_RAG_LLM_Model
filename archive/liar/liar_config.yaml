@@ -1,0 +1,9 @@
+# Was the liar: section of configs/default.yaml (archived 2026-11-13).
+# To use it again, append it to configs/default.yaml.
+# LIAR (PolitiFact, 6 labels, no evidence): out-of-domain eval + claim pool for the agent.
+# Data: python -m claimscan.data.liar --download  (~10 MB under artifacts_root/liar)
+# label_map: binary | binary_strict | three_way, or an explicit {liar_label: TRUE|FALSE|NOT ENOUGH INFO}
+#   (see claimscan/data/liar.py). Eval: python -m claimscan.eval.liar_eval --max-claims 100
+liar:
+  dir: liar
+  label_map: binary

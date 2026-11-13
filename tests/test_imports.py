@@ -8,7 +8,6 @@ MODULES = [
   "claimscan.data.fever_claim",
   "claimscan.data.fever_evidence",
   "claimscan.data.fever_wiki_dump",
-  "claimscan.data.liar",
   "claimscan.data.unify",
   "claimscan.neurosymbolic_layer",
   "claimscan.neurosymbolic_layer.score",
