@@ -1,12 +1,11 @@
-"""Turn FAISS hits (page id + line) into evidence sentences, ranked by the quality scorer.
+"""Turn retriever hits (page id + line) into evidence sentences, ranked by the quality scorer.
 
-Moved from rag/Inference/test_rag.py (api/main.py imported it from score_evidence, where
-it never lived). The ranking is unchanged; it can now also return each sentence's
-"Page#line" and look sentences up in an (id, line)-indexed corpus.
+Moved from rag/Inference/test_rag.py. Can return each sentence's "Page#line" and look
+sentences up in an (id, line)-indexed corpus. Ranking: see claimscan/neurosymbolic_layer/.
 """
 import pandas as pd
 
-from claimscan.evidence.scoring import score_evidence_quality
+from claimscan.neurosymbolic_layer import score_evidence_quality
 
 
 def _lookup_text(corpus_df, page, line):
@@ -26,25 +25,47 @@ def index_corpus(corpus_df):
   return corpus_df.set_index(["id", "line"]).sort_index()
 
 
-def get_evidence(claim, evidence_results, corpus_df, with_ids=False):
-  """Top-3 evidence sentences by quality score.
+TOP_N = 3
+MAX_PER_PAGE = 2
 
-  Returns their texts, or with ``with_ids=True`` a list of (text, "Page#line") pairs.
+
+def _diverse_top(candidates, n=TOP_N, max_per_page=MAX_PER_PAGE):
+  """Best ``n`` candidates with at most ``max_per_page`` from one page; if there are not
+  enough other pages, the skipped ones fill the remaining slots (never returns fewer)."""
+  picked, skipped, per_page = [], [], {}
+  for c in candidates:
+    if per_page.get(c['page'], 0) < max_per_page:
+      picked.append(c)
+      per_page[c['page']] = per_page.get(c['page'], 0) + 1
+    else:
+      skipped.append(c)
+    if len(picked) == n:
+      return picked
+  return picked + skipped[:n - len(picked)]
+
+
+def get_evidence(claim, evidence_results, corpus_df, with_ids=False):
+  """Top-3 evidence sentences by quality score, at most 2 from the same page.
+
+  ``evidence_results`` must be best-first (every retriever returns them that way); the
+  scorer uses each hit's position, not its raw score, so faiss / bm25 / hybrid all work.
+  Returns texts, or with ``with_ids=True`` a list of (text, "Page#line") pairs.
   ``corpus_df`` may be the raw corpus or ``index_corpus(corpus_df)`` (much faster).
   """
   candidates = []
-  for result in evidence_results:
+  for rank, result in enumerate(evidence_results):
     text = _lookup_text(corpus_df, result['id'], result['line'])
     if text is not None:
-      new_score = score_evidence_quality(claim, text, result['score'])
       candidates.append({
                 'text': text,
+                'page': result['id'],
                 'docid': f"{result['id']}#{result['line']}",
-                'quality_score': new_score,
+                'quality_score': score_evidence_quality(claim, text, rank, page=result['id']),
                 'retrieval_score': result['score']
             })
 
   candidates.sort(key = lambda x: x['quality_score'], reverse = True)
+  top = _diverse_top(candidates)
   if with_ids:
-    return [(c['text'], c['docid']) for c in candidates[:3]]
-  return [c['text'] for c in candidates[:3]]
+    return [(c['text'], c['docid']) for c in top]
+  return [c['text'] for c in top]

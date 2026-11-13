@@ -10,9 +10,11 @@ MODULES = [
   "claimscan.data.fever_wiki_dump",
   "claimscan.data.liar",
   "claimscan.data.unify",
-  "claimscan.evidence.scoring",
+  "claimscan.neurosymbolic_layer",
+  "claimscan.neurosymbolic_layer.score",
   "claimscan.evidence.select",
   "claimscan.retrieval.hybrid_retriever",
+  "claimscan.retrieval.faiss_batch",
   "claimscan.retrieval.bm25_retriever",
   "claimscan.retrieval.bm25_index",
   "claimscan.eval",
@@ -27,6 +29,11 @@ MODULES = [
   "claimscan.agents",
   "claimscan.graph",
   "claimscan.rerank",
+  "claimscan.rerank.base",
+  "claimscan.rerank.cohere",
+  "claimscan.rerank.openai_llm",
+  "claimscan.rerank.cross_encoder",
+  "claimscan.rerank.llamacpp",
   "claimscan.serve",
 ]
 NEEDS_FAISS = [
@@ -34,6 +41,8 @@ NEEDS_FAISS = [
   "claimscan.retrieval.faiss_indexer",
   "claimscan.retrieval.faiss_embeddings",
   "claimscan.eval.eval_retriever",
+  "claimscan.eval.benchmark",
+  "claimscan.tracking",
   "claimscan.verifier.prepare",
 ]
 
