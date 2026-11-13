@@ -1,12 +1,20 @@
 """Sweep retrieval k and confidence threshold over a fixed claim list; log to MLflow.
 Was experiments/run_experiments.py. It used to patch model/retriever/corpus into
 test_rag's globals; it now passes a Services object to fact_check_cleaned.
+Logs to the project MLflow store (claimscan.tracking: SQLite under artifacts_root).
 """
-import mlflow
+import tempfile
+from pathlib import Path
+
+import matplotlib
+matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
 
 from claimscan.pipeline import fact_check_cleaned, load_services
+from claimscan.tracking import setup_mlflow
+
+mlflow = setup_mlflow("fever_fact_checking")
 
 test_claims = [
     # Clear factual claims
@@ -93,9 +101,10 @@ def run_experiment(k_value, conf_threshold):
         false_negatives += 1
       
     accuracy = correct/len(test_claims)
-    recall = true_positives / (false_negatives + true_positives)
-    precision = true_positives / (true_positives + false_positives)
-    f1_score = (2 * precision * recall) / (precision + recall)
+    # 0 instead of ZeroDivisionError when nothing is predicted / labelled TRUE
+    recall = true_positives / max(false_negatives + true_positives, 1)
+    precision = true_positives / max(true_positives + false_positives, 1)
+    f1_score = (2 * precision * recall) / (precision + recall) if precision + recall else 0.0
 
     mlflow.log_metrics({
       "accuracy": accuracy,
@@ -119,18 +128,16 @@ def run_experiment(k_value, conf_threshold):
     plt.title(f'Confusion Matrix (k={k_value}, threshold={conf_threshold})')
     plt.tight_layout()
 
-    cm_path = f"confusion_matrix_k{k_value}_conf{conf_threshold}.png"
-    plt.savefig(cm_path)
-    mlflow.log_artifact(cm_path)
+    with tempfile.TemporaryDirectory() as d:  # not in the cwd; MLflow keeps the copy
+      cm_path = Path(d) / f"confusion_matrix_k{k_value}_conf{conf_threshold}.png"
+      plt.savefig(cm_path)
+      mlflow.log_artifact(str(cm_path))
     plt.close()  # Important: free memory
 
 if __name__ == "__main__":
   print("Loading model and retriever...")
   services = load_services()
   print("Loading complete!\n")
-
-  mlflow.set_experiment("fever_fact_checking")
-  print("completed")
 
   run_experiment(k_value=10, conf_threshold=0.50)
   run_experiment(k_value=30, conf_threshold=0.65)
