@@ -1,173 +1,129 @@
+"""Build verifier training data: (claim, evidence sentences, label) examples.
+
+TRUE / FALSE examples use the claim's gold evidence; NOT ENOUGH INFO examples use the
+claim's top FAISS hits that are not gold evidence. Up to ``--per-class`` of each.
+
+Fixes over the first version (whose output trained the current checkpoint):
+  * line 0: gold line 0 is stored as -1 (eval/gold.py); it was never matched, so ~46% of
+    gold sentences were lost and gold line-0 sentences could be used as NEI negatives.
+  * speed: sentences are looked up in an (id, line)-indexed corpus and evidence is grouped
+    by claim once, instead of scanning 25M corpus rows / 367k evidence rows per claim.
+  * repeated gold sentences (same sentence in several annotation sets) are kept once.
+  * ``--split validation`` builds a held-out set from FEVER's dev claims.
+
+Usage:
+  python -m claimscan.verifier.prepare                       # train split -> training_data_v2.json
+  python -m claimscan.verifier.prepare --split validation --per-class 500 --out verifier_val.json
+"""
+import argparse
 import json
-import random
-import unicodedata
-import re
 from pathlib import Path
+
 import pandas as pd
 from tqdm import tqdm
-import tempfile
-import shutil
-import os
 
-#Creates model training data 
-
-from claimscan.retrieval.faiss_retriever import FAISSRetriever
 from claimscan.config import config
+from claimscan.eval.gold import fix_line, load_claims, norm_title
+from claimscan.evidence.select import _lookup_text, index_corpus
 
-def norm_title(s):
+LABELS = ("TRUE", "FALSE", "NOT ENOUGH INFO")
 
-    s = unicodedata.normalize("NFKC", str(s)).strip()
-    return re.sub(r"\s+", "_", s)
 
-def load_fever_data():
-    df_claims = pd.read_parquet(config.claims_file)
-    df_corpus = pd.read_parquet(config.corpus)
-    df_evidence = pd.read_parquet(config.evidence)
+def group_gold_pairs(evidence_df):
+  """{claim id: [(page, line), ...]} in file order, line-0 fixed, no duplicates. NEI rows (no page) are skipped."""
+  ev = evidence_df[evidence_df["evidence_wiki_url"].notna() & (evidence_df["evidence_wiki_url"] != "")]
+  out = {}
+  for cid, page, line in zip(ev["id"], ev["evidence_wiki_url"], ev["evidence_sentence_id"]):
+    pairs = out.setdefault(int(cid), [])
+    pair = (norm_title(page), fix_line(line))
+    if pair not in pairs:
+      pairs.append(pair)
+  return out
 
-    return df_claims, df_corpus, df_evidence
 
-def get_evidence_text(gold_evidence, corpus_df):
-    sentences = []
-    for _, row in gold_evidence.iterrows():
-        wiki_url = norm_title(row['evidence_wiki_url'])
-        sentence_id = row['evidence_sentence_id']
+def get_evidence_text(gold_pairs, corpus):
+  """Texts of the gold (page, line) pairs found in the corpus."""
+  texts = (_lookup_text(corpus, page, line) for page, line in gold_pairs)
+  return [t for t in texts if t is not None]
 
-        #find gold evidence in corpus 
-        match = corpus_df[
-            (corpus_df['id'] == wiki_url) & (corpus_df['line']==sentence_id)
-        ]
 
-        if not match.empty:
-            sentences.append(match.iloc[0]['text'])
-    return sentences
+def get_negative_text(claim_text, gold_pairs, corpus, retriever, k=20):
+  """Texts of the top-k FAISS hits that are not gold evidence, up to negative_samples_per_claim."""
+  gold = set(gold_pairs)
+  negatives = []
+  for result in retriever.search(claim_text, k=k):
+    pair = (norm_title(result["id"]), int(result["line"]))
+    if pair in gold:
+      continue
+    text = _lookup_text(corpus, *pair)
+    if text is not None:
+      negatives.append(text)
+      if len(negatives) >= config.negative_samples_per_claim:
+        break
+  return negatives
 
-def get_negative_text(claim_text, gold_evidence, corpus_df, retriever):
-    try:
-        results = retriever.search(claim_text, k = 20)
 
-        gold_pairs = set()
-        for _, row in gold_evidence.iterrows():
-            wiki_url = norm_title(row['evidence_wiki_url'])
-            sentence_id = row['evidence_sentence_id']
-            gold_pairs.add((wiki_url, sentence_id))
-        
+def create_training_data(claims_df, gold_by_claim, corpus, retriever, per_class=2500, n_claims=75000, seed=19):
+  claims = claims_df.sample(n=min(n_claims, len(claims_df)), random_state=seed)
+  found = {label: [] for label in LABELS}
+
+  def add(label, claim_id, claim_text, sentences):
+    found[label].append({
+      "claim_id": claim_id,
+      "claim": claim_text,
+      "evidence": sentences[:config.max_evidence_sentences],
+      "label": label,
+    })
+
+  for row in tqdm(claims.itertuples(index=False), total=len(claims), desc="Processing claims"):
+    claim_id, claim_text, label = int(row.id), str(row.claim), str(row.label_text)
+    gold_pairs = gold_by_claim.get(claim_id, [])
+
+    if gold_pairs and label in ("TRUE", "FALSE") and len(found[label]) < per_class:
+      sentences = get_evidence_text(gold_pairs, corpus)
+      if sentences:
+        add(label, claim_id, claim_text, sentences)
+
+    if len(found["NOT ENOUGH INFO"]) < per_class:
+      try:
+        negatives = get_negative_text(claim_text, gold_pairs, corpus, retriever)
+      except Exception as e:  # one bad query shouldn't kill a multi-hour run
+        print(f"Retrieval failed for claim {claim_id}: {e}")
         negatives = []
-        for result in results:
-            page = norm_title(result['id'])
-            line = int(result['line'])
+      if negatives:
+        add("NOT ENOUGH INFO", claim_id, claim_text, negatives)
 
-            if (page, line) in gold_pairs:
-                continue
+    if all(len(v) >= per_class for v in found.values()):
+      break
 
-            match = corpus_df[
-                (corpus_df['id'] == page) & (corpus_df['line'] == line)
-            ]
+  print("\nCollected: " + ", ".join(f"{k}={len(v)}" for k, v in found.items()))
+  return [ex for label in LABELS for ex in found[label]]
 
-            if not match.empty:
-                negatives.append(match.iloc[0]['text'])
-                if len(negatives) >= config.negative_samples_per_claim:
-                    break
-
-        return negatives
-    except Exception as e:
-        print(f"Error {e}")
-        return []
-    
-
-def create_training_data(claims_df, evidence_df, corpus_df, retriver, target_amount_per_class = 2500):
-    train_claims = claims_df[claims_df['split'] == "train"].sample(n=75000, random_state=19)
-
-    true_examples = []
-    false_examples = []
-    nei_examples = []
-
-    for _, row in tqdm(train_claims.iterrows(), total=len(train_claims), desc="Processing claims"):
-        claim_id = int(row['id'])
-        claim_text = str(row['claim'])
-        label = str(row['label_text'])
-
-        gold_evidence = evidence_df[evidence_df['id'] == claim_id]
-
-        #if there is evidence and evidence is true, collect true evidence 
-        if not gold_evidence.empty and label == 'TRUE' and len(true_examples) < target_amount_per_class:
-            sentences = get_evidence_text(gold_evidence, corpus_df)
-            if sentences:
-                true_examples.append({
-                    "claim_id": claim_id,
-                    "claim": claim_text,
-                    "evidence": sentences[:config.max_evidence_sentences],
-                    "label" : label
-                })
-
-        if not gold_evidence.empty and label == 'FALSE' and len(false_examples) < target_amount_per_class:
-            sentences = get_evidence_text(gold_evidence, corpus_df)
-            if sentences:
-                false_examples.append({
-                    "claim_id": claim_id,
-                    "claim": claim_text,
-                    "evidence": sentences[:config.max_evidence_sentences],
-                    "label" : label
-                })
-
-        if len(nei_examples) < target_amount_per_class:
-            neg_sentences = get_negative_text(claim_text, gold_evidence, corpus_df, retriver)
-            if neg_sentences:
-                nei_examples.append({
-                    "claim_id": claim_id,
-                    "claim": claim_text,
-                    "evidence": neg_sentences[:config.max_evidence_sentences],
-                    "label" : "NOT ENOUGH INFO"
-                })
-
-        if len(true_examples) >= target_amount_per_class and len(false_examples) >= target_amount_per_class and len(nei_examples) >= target_amount_per_class:
-            break
-    
-    print(f"\nCollected: TRUE={len(true_examples)}, FALSE={len(false_examples)}, NEI={len(nei_examples)}")
-
-    examples = true_examples + false_examples + nei_examples
-    return examples
 
 def main():
-    claims_df, corpus_df, evidence_df = load_fever_data()
+  default_out = config.verifier_training_data.with_name("training_data_v2.json")
+  ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
+  ap.add_argument("--split", default="train", help="train / validation / test")
+  ap.add_argument("--per-class", type=int, default=2500)
+  ap.add_argument("--n-claims", type=int, default=75000, help="claims sampled from the split")
+  ap.add_argument("--out", type=Path, default=default_out)
+  args = ap.parse_args()
 
-    retriver  = FAISSRetriever(config.retriever_index_dir, config.retriever_model)
+  from claimscan.retrieval.faiss_retriever import FAISSRetriever
 
-    examples = create_training_data(claims_df, evidence_df, corpus_df, retriver )
-    
-    try:
-        backup_path = Path("training_data.json")
-        with open(backup_path, "w") as f:
-            json.dump(examples, f, indent=2)
-        print(f"BACKUP SUCCESS: Saved to {backup_path.absolute()}")
-        return
-        
-    except Exception as e:
-        print(f"Failed as {e}")
-    
+  claims_df = load_claims(args.split)
+  gold_by_claim = group_gold_pairs(pd.read_parquet(config.evidence))
+  print("Loading and indexing the corpus (a few minutes, ~several GB RAM)...")
+  corpus = index_corpus(pd.read_parquet(config.corpus, columns=["id", "line", "text"]))
+  retriever = FAISSRetriever(config.retriever_index_dir, config.retriever_model)
+
+  examples = create_training_data(claims_df, gold_by_claim, corpus, retriever, args.per_class, args.n_claims)
+
+  args.out.parent.mkdir(parents=True, exist_ok=True)
+  with open(args.out, "w") as f:
+    json.dump(examples, f, indent=2)
+  print(f"Saved {len(examples)} examples to {args.out}")
+
 
 if __name__ == "__main__":
-    main()
-
-#Output:
-'''
-JSON:
-  {
-    "claim_id": 75397,
-    "claim": "Barack Obama was born in Hawaii",
-    "evidence": ["Barack Obama was born in Honolulu, Hawaii, on August 4, 1961."],
-    "label": "TRUE"
-  },
-  {
-    "claim_id": 75397,
-    "claim": "Barack Obama was born in Hawaii", 
-    "evidence": ["Barack Obama graduated from Harvard Law School."],
-    "label": "NOT ENOUGH INFO"
-  },
-  {
-    "claim_id": 185043,
-    "claim": "Danny Brown is an American rapper",
-    "evidence": ["Daniel Dewan Sewell, better known by his stage name Danny Brown, is an American rapper."],
-    "label": "TRUE"
-  }
-]
-'''
+  main()
