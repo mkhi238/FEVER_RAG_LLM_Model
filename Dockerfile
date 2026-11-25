@@ -55,7 +55,7 @@ RUN useradd --create-home --uid 1000 app
 USER app
 
 EXPOSE 8000
-HEALTHCHECK --interval=30s --timeout=5s --start-period=300s --retries=3 \
+HEALTHCHECK --interval=30s --timeout=5s --start-period=1500s --retries=3 \
   CMD python -c "import json,urllib.request,sys; sys.exit(0 if json.load(urllib.request.urlopen('http://127.0.0.1:8000/health'))['models_loaded'] else 1)"
 
 # one worker: inference is CPU-bound and serialised by a lock (the Lucene searcher isn't thread-safe)
