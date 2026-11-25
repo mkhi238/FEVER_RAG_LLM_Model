@@ -14,7 +14,7 @@ import torch
 
 from claimscan.config import ClaimScanConfig, config
 from claimscan.evidence.select import _lookup_text, get_evidence
-from claimscan.verifier.model import FEVERVerifier
+from claimscan.verifier.deberta_verifier import FEVERVerifier
 
 LABEL_MAP = {0: "TRUE", 1: "FALSE", 2: "NOT ENOUGH INFO"}
 

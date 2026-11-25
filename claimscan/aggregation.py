@@ -1,6 +1,6 @@
 """Glue between fact_check_detailed and the rear aggregator (claimscan/instruct/rear_aggregator.py).
 
-The aggregator (an LLM on llama-server, or a hosted OpenAI-compatible API) reads the verifier's verdict + evidence and may veto it,
+The aggregator (an LLM on llama-server, or Together AI when a key is set) reads the verifier's verdict + evidence and may veto it,
 which can only turn TRUE/FALSE into NOT ENOUGH INFO. The veto is applied only when the verifier is
 unsure (conf < 0.6) or the LLM is sure (llm_confidence >= 0.9); that gate is fixed in
 rear_aggregator.final_label, not configured here. It is optional and FAILS OPEN: if the server
@@ -12,7 +12,6 @@ langchain installed while the aggregator is disabled.
 """
 from __future__ import annotations
 
-import inspect
 import logging
 import os
 import re
@@ -69,7 +68,7 @@ class AggregatedVerdict:
 
 
 def build_llm(cfg):
-  """The structured runnable aggregate() expects, pointed at cfg.aggregator_base_url. Needs langchain_openai.
+  """The structured runnable aggregate() expects: build_chat("aggregator") on cfg.aggregator_base_url, or ChatTogether when a key is set.
 
   The API key comes from the env var NAMED by cfg.aggregator_api_key_env (empty = local llama-server, no key).
   If that var is unset/empty, returns an UnavailableLLM so every request fails open with that reason.
@@ -81,24 +80,17 @@ def build_llm(cfg):
       log.warning("rear aggregator: API key env var %s is missing or empty; every request will fail open", key_env)
       return UnavailableLLM(f"API key env var {key_env} is missing or empty")
     _secrets.add(api_key)
-  else:
-    api_key = "not-needed"   # llama-server ignores the key
 
-  from claimscan.instruct import model, rear_aggregator, schemas
+  from claimscan.instruct import chat_clients, rear_aggregator, schemas
   # the instruct package's VetoOutput wins; the local class is only a fallback until it defines one
   schema = getattr(rear_aggregator, "VetoOutput", None) or getattr(schemas, "VetoOutput", None) or VetoOutput
-  kw = dict(base_url=cfg.aggregator_base_url, timeout=cfg.aggregator_timeout)
-  if "api_key" in inspect.signature(model.build_chat).parameters:
-    kw["api_key"] = api_key
-  try:
-    if key_env and "api_key" not in kw:
-      raise NotImplementedError   # build_chat can't take a key yet: a hosted API needs the inline client
-    chat = model.build_chat("aggregator", **kw)
-  except NotImplementedError:
-    # fallback until claimscan/instruct/model.py build_chat is written; delete it then
-    from langchain_openai import ChatOpenAI
-    chat = ChatOpenAI(base_url=cfg.aggregator_base_url, model=cfg.aggregator_model, api_key=api_key,
-                      timeout=cfg.aggregator_timeout, max_retries=0, temperature=0)
+  if key_env:
+    # hosted: Together AI (its own endpoint; aggregator.base_url is only for the local llama-server)
+    from langchain_together import ChatTogether
+    chat = ChatTogether(model=cfg.aggregator_model, api_key=api_key,
+                        timeout=cfg.aggregator_timeout, max_retries=0, temperature=0)
+  else:
+    chat = chat_clients.build_chat("aggregator", base_url=cfg.aggregator_base_url, timeout=cfg.aggregator_timeout)
   return chat.with_structured_output(schema, method="json_schema")
 
 

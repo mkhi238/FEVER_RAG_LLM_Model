@@ -4,7 +4,7 @@ The LLM (Gemma on llama-server) reads one ClaimResult at a time and may ask to V
 Code (final_label) decides whether the veto is applied, not the LLM:
   - it only ever turns TRUE/FALSE into NOT ENOUGH INFO, never TRUE <-> FALSE;
   - only when the verifier is unsure (conf < 0.6) or the LLM is sure (llm_confidence >= 0.9). Fixed, not configurable.
-No llama.cpp or connection code here: `llm` is passed in (model.build_chat(...).with_structured_output(VetoOutput)),
+No llama.cpp or connection code here: `llm` is passed in (chat_clients.build_chat(...).with_structured_output(VetoOutput)),
 so tests can pass a fake. Contract: tests/test_rear_aggregator.py. Wired into the API by claimscan/aggregation.py.
 """
 from langchain_core.messages import HumanMessage, SystemMessage

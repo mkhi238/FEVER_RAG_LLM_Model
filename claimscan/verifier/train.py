@@ -13,7 +13,7 @@ from tqdm import tqdm
 from pathlib import Path
 import matplotlib.pyplot as plt
 from claimscan.config import config
-from claimscan.verifier.model import FEVERVerifier
+from claimscan.verifier.deberta_verifier import FEVERVerifier
 
 class FEVERDatasetLoader(Dataset):
   def __init__(self, examples, model):

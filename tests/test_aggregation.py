@@ -256,7 +256,7 @@ def test_api_no_veto(client_with):
 
 # ---- API key for a hosted aggregator ----
 class CapturedChat:
-  """Stands in for ChatOpenAI: records the constructor kwargs."""
+  """Stands in for ChatTogether / ChatOpenAI: records the constructor kwargs."""
   made = []
 
   def __init__(self, **kw):
@@ -269,15 +269,12 @@ class CapturedChat:
 
 @pytest.fixture
 def capture_chat(monkeypatch):
-  import langchain_openai
+  import langchain_together
 
-  from claimscan.instruct import model
-
-  def not_written(*a, **k):
-    raise NotImplementedError
+  from claimscan.instruct import chat_clients
   CapturedChat.made = []
-  monkeypatch.setattr(langchain_openai, "ChatOpenAI", CapturedChat)   # what build_llm's inline fallback imports
-  monkeypatch.setattr(model, "build_chat", not_written)
+  monkeypatch.setattr(langchain_together, "ChatTogether", CapturedChat)   # hosted path (key set)
+  monkeypatch.setattr(chat_clients, "ChatOpenAI", CapturedChat)           # local path (build_chat)
   return CapturedChat.made
 
 
@@ -290,11 +287,11 @@ def _cfg(**kw):
 
 def test_key_read_from_named_env_var(capture_chat, monkeypatch):
   monkeypatch.setenv("TEST_AGG_KEY", "sk-test-secret-123")
-  aggregation.build_llm(_cfg(aggregator_api_key_env="TEST_AGG_KEY", aggregator_base_url="https://api.openai.com/v1",
-                             aggregator_model="gpt-5-nano"))
+  aggregation.build_llm(_cfg(aggregator_api_key_env="TEST_AGG_KEY", aggregator_model="meta-llama/Llama-3.3-70B-Instruct-Turbo"))
   kw = capture_chat[-1]
   assert kw["api_key"] == "sk-test-secret-123"
-  assert kw["base_url"] == "https://api.openai.com/v1" and kw["model"] == "gpt-5-nano"
+  assert kw["model"] == "meta-llama/Llama-3.3-70B-Instruct-Turbo"
+  assert "base_url" not in kw   # Together's own endpoint, not the local llama-server URL
 
 
 def test_default_key_is_not_needed(capture_chat):

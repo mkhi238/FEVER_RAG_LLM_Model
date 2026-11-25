@@ -19,6 +19,7 @@ pydantic-core==2.50.4
 pyyaml==6.0.3
 langchain-core==1.8.0
 langchain-openai==1.7.4
+langchain-together==0.4.0
 openai==3.49.0
 tiktoken==0.14.0
 pyserini==2.4.0
