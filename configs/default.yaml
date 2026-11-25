@@ -33,8 +33,10 @@ retriever:
   # First query ~25 s (page cache warm-up), then ~0.1 s.
   mmap: true
   # Which retriever load_services() builds: faiss | bm25 | hybrid  (evidence scoring uses each
-  # hit's rank, not its score, so the bm25/faiss score directions don't matter there)
-  kind: faiss
+  # hit's rank, not its score, so the bm25/faiss score directions don't matter there).
+  # Shipped default: hybrid = FAISS + BM25 without RM3 ("hybrid_norm3" in the benchmark; 300 claims, k=30:
+  # label acc 0.51, FEVER 0.38, best evidence recall/F1, ~2.2 s/claim). Run 20261124-220309.
+  kind: hybrid
 
 # Sentence-level BM25 (pyserini/Lucene) over the full 25.2M-sentence corpus.
 # Build: python -m claimscan.retrieval.bm25_index   (jsonl/ ~5 GB + index/ ~5 GB under dir)
@@ -42,7 +44,9 @@ bm25:
   dir: sparse/bm25_sentences
   k1: 1.2
   b: 0.4
-  rm3: true            # RM3 query expansion; needs the index built with docvectors (the builder does this)
+  # RM3 query expansion off ("bm25_norm3"): better on FEVER (acc 0.543 vs 0.537, FEVER 0.377 vs 0.337 at k=30)
+  # and ~17x faster cold (~0.43 s vs ~7 s/query). true needs the index built with docvectors (the builder does).
+  rm3: false
 
 # Reciprocal rank fusion of FAISS + BM25: score = sum over retrievers of 1 / (rrf_k + rank)
 hybrid:
@@ -65,6 +69,23 @@ rerank:
   openai_model: gpt-5-nano
   openai_base_url: https://api.openai.com/v1   # or http://localhost:8080/v1 for llama.cpp
   openai_mode: pointwise    # pointwise | listwise
+
+# Rear aggregator: an LLM (Gemma GGUF on llama-server) reads the verifier's verdict + evidence and may
+# veto it, which only turns TRUE/FALSE into NOT ENOUGH INFO (claimscan/aggregation.py). The veto gate is
+# fixed in rear_aggregator.final_label: applied only if verifier conf < 0.6 OR llm_confidence >= 0.9. API only; the
+# benchmark never uses it. Fails open: if the server is down the verifier's verdict is returned.
+# Env: CLAIMSCAN_AGGREGATOR_ENABLED (1/0), CLAIMSCAN_AGGREGATOR_URL, CLAIMSCAN_AGGREGATOR_MODEL,
+#      CLAIMSCAN_AGGREGATOR_TIMEOUT, CLAIMSCAN_AGGREGATOR_API_KEY_ENV
+# Hosted API instead of llama-server:
+#   base_url: https://api.openai.com/v1
+#   model: gpt-5-nano
+#   api_key_env: OPENAI_API_KEY        # the key itself stays in that env var, never in this file
+aggregator:
+  enabled: false
+  base_url: http://127.0.0.1:8083/v1   # OpenAI-compatible llama-server (aggregator role in llamacpp/roles.yaml)
+  model: gemma                         # llama-server serves one model and ignores the name; hosted APIs need a real one
+  api_key_env: ""                      # NAME of the env var holding the API key; "" = local llama-server (no key)
+  timeout: 30                          # seconds per request; no retries
 
 # Every dense FAISS index under artifacts_root/dense. faiss_embeddings.py and faiss_indexer.py
 # build any of them with --index <name>; the retriever above uses bge_small.

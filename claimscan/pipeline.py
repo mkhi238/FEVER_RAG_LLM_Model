@@ -7,13 +7,13 @@ The demo claim list moved to scripts/rag_demo.py.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import pandas as pd
 import torch
 
 from claimscan.config import ClaimScanConfig, config
-from claimscan.evidence.select import get_evidence
+from claimscan.evidence.select import _lookup_text, get_evidence
 from claimscan.verifier.model import FEVERVerifier
 
 LABEL_MAP = {0: "TRUE", 1: "FALSE", 2: "NOT ENOUGH INFO"}
@@ -23,7 +23,7 @@ LABEL_MAP = {0: "TRUE", 1: "FALSE", 2: "NOT ENOUGH INFO"}
 class Services:
   model: FEVERVerifier
   retriever: "FAISSRetriever | BM25Retriever | HybridRetriever"
-  corpus_df: pd.DataFrame
+  corpus_df: "pd.DataFrame | SentenceStore"   # SentenceStore: per-request lookup, used by the API
 
 
 def load_verifier(cfg: ClaimScanConfig = config) -> FEVERVerifier:
@@ -114,24 +114,53 @@ def fact_check(claim, services: Services):
 
 
 
+@dataclass
+class Verdict:
+  label: str
+  confidence: float                 # max verifier probability (0.0 when no evidence was found)
+  probs: dict | None                # {"TRUE": p, "FALSE": p, "NOT ENOUGH INFO": p}, None without evidence
+  evidence: list                    # [(text, "Page#line"), ...] sent to the verifier, best first
+  downgraded: bool = False          # TRUE/FALSE turned into NEI by the confidence threshold
+  # every retrieved hit, best first: {"rank", "id", "line", "docid", "score", "text"} (text None if not in the corpus).
+  # This is what an LLM layer reads to synthesise over the top k instead of the verifier's 3 sentences.
+  hits: list = field(default_factory=list)
+
+
+def fact_check_detailed(claim, services: Services, k=30, conf_threshold=0.5) -> Verdict:
+  """The evaluated decision logic, with everything the API needs to show its work.
+
+  ``services.corpus_df`` is a corpus DataFrame (raw or ``index_corpus``-ed) or anything with a
+  ``for_hits(hits)`` method returning one, such as ``claimscan.evidence.store.SentenceStore``.
+  """
+  evidence_results = services.retriever.search(claim, k=k)
+  corpus = services.corpus_df
+  if hasattr(corpus, "for_hits"):
+    corpus = corpus.for_hits(evidence_results)
+  picked = get_evidence(claim, evidence_results, corpus, with_ids=True)
+  evidence = [text for text, _ in picked]
+  hits = [{"rank": r, "id": h["id"], "line": int(h["line"]), "docid": f"{h['id']}#{h['line']}",
+           "score": float(h.get("score", 0.0)), "text": _lookup_text(corpus, h["id"], h["line"])}
+          for r, h in enumerate(evidence_results)]
+
+  if not evidence:
+    return Verdict("NOT ENOUGH INFO", 0.0, None, [], hits=hits)
+
+  prediction, probs = verify(services.model, claim, evidence)
+
+  confidence = torch.max(probs).item()
+  downgraded = confidence < conf_threshold and prediction != "NOT ENOUGH INFO"
+  if downgraded:
+    prediction = "NOT ENOUGH INFO"
+
+  return Verdict(prediction, confidence, {LABEL_MAP[i]: float(p) for i, p in enumerate(probs)}, picked, downgraded,
+                 hits=hits)
+
+
 def fact_check_cleaned(claim, services: Services, k=30, conf_threshold=0.5, return_evidence=False):
     """Fact check without debug prints - for MLflow experiments and claimscan.eval.
 
     With ``return_evidence=True`` returns (prediction, ["Page#line", ...]) for the evidence
     sentences sent to the verifier; the decision logic is the same either way.
     """
-    evidence_results = services.retriever.search(claim, k=k)
-    picked = get_evidence(claim, evidence_results, services.corpus_df, with_ids=True)
-    evidence = [text for text, _ in picked]
-    evidence_ids = [docid for _, docid in picked]
-
-    if not evidence:
-        return ("NOT ENOUGH INFO", []) if return_evidence else "NOT ENOUGH INFO"
-
-    prediction, probs = verify(services.model, claim, evidence)
-
-    confidence = torch.max(probs).item()
-    if confidence < conf_threshold and prediction != "NOT ENOUGH INFO":
-        prediction = "NOT ENOUGH INFO"
-
-    return (prediction, evidence_ids) if return_evidence else prediction
+    v = fact_check_detailed(claim, services, k=k, conf_threshold=conf_threshold)
+    return (v.label, [docid for _, docid in v.evidence]) if return_evidence else v.label

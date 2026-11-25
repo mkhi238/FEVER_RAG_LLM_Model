@@ -1,39 +1,38 @@
-# ClaimScan direct dependencies. Lower bounds = versions verified in .venv (2026-11-12);
-# upper bounds only where a major release is known to change behaviour.
-# Dev/test extras (pytest) live in pyproject.toml: pip install -e ".[dev]"
+# ClaimScan runtime dependencies: what the API and the pipeline import
+# (claimscan.api -> pipeline -> FAISS retriever -> neurosymbolic evidence scoring -> DeBERTa verifier).
+# Lower bounds = versions verified in .venv (2026-11-24); upper bounds only where a major release
+# is known to change behaviour. pyproject.toml reads this file, so `pip install -e .` installs exactly this.
+#
+# Training, evaluation, BM25 and the experimental LLM stack: requirements-dev.txt
+# (pip install -r requirements-dev.txt; it includes this file).
+#
+# torch: no index here on purpose. .venv uses the CUDA build (cu126, RTX 2060); the Docker image
+# installs the CPU wheel from https://download.pytorch.org/whl/cpu first, and pip then treats this
+# line as already satisfied instead of pulling ~3 GB of CUDA wheels from PyPI.
 
-# --- models / ML
-torch>=2.14                     # .venv has the cu126 build (RTX 2060, sm_75)
+# --- models
+torch>=2.14
 transformers>=5.22,<6           # 5.x loads stored dtype; verifier/model.py casts DeBERTa back to fp32
-sentencepiece>=0.2.3
-sentence-transformers>=6.3,<7
-scikit-learn>=1.9.1
+sentencepiece>=0.2.3            # DeBERTa-v3 ships only spm.model ...
+protobuf>=7.36,<8               # ... and converting it to a fast tokenizer needs protobuf (without it
+                                # transformers falls back to tiktoken and fails on spm.model)
+sentence-transformers>=6.3,<7   # bge-small query encoder
 
-# --- retrieval
+# --- retrieval + data
 faiss-cpu>=1.16
-pyserini>=2.4,<3                # BM25 (Lucene); needs Java 21
-
-# --- data
+pyserini>=2.4,<3                # BM25 (Lucene) half of the shipped hybrid retriever; needs Java 21.
+                                # The faiss-only Docker image (WITH_BM25=0) filters this line out.
 numpy>=2.5
 pandas>=3.1,<4
-pyarrow>=26.0
-datasets>=5.2
+pyarrow>=26.0                   # parquet (docids, corpus) and the sentence-store builder
 
-# --- LLM orchestration (front facer / decomposer / agent graph)
-langchain>=1.5,<2
-langchain-core>=1.8,<2
-langchain-openai>=1.7,<2        # ChatOpenAI talks to any OpenAI-compatible API (hosted or llama-server /v1)
-langgraph>=1.2,<2
-httpx>=0.28                     # LLM role client; also needed by FastAPI's TestClient
-
-# --- evaluation
-evaluate>=0.4.6                 # loads the vendored FEVER metric (claimscan/eval/metrics/fever)
-
-# --- serving / tracking / utils
+# --- serving + config
 fastapi>=0.162
 uvicorn>=0.54
 pydantic>=2.14,<3
-mlflow>=3.18
-matplotlib>=3.11
-tqdm>=4.70
 pyyaml>=6.0
+
+# --- rear aggregator (optional, OFF by default: aggregator.enabled / CLAIMSCAN_AGGREGATOR_ENABLED).
+# ChatOpenAI talks to llama-server's OpenAI-compatible /v1. Imported lazily, so the API runs without them.
+langchain-core>=1.8,<2
+langchain-openai>=1.7,<2

@@ -47,13 +47,34 @@ def test_health_and_true(client_with):
 
 
 def test_low_confidence_becomes_nei(client_with):
-  # softmax([0.1, 0, 0]) max ~ 0.35 < 0.55 threshold
+  # softmax([0.1, 0, 0]) max ~ 0.35 < 0.5 threshold
   with client_with([0.1, 0.0, 0.0]) as client:
     body = client.post("/fact-check", json={"claim": "Tokyo is the capital of Japan"}).json()
     assert body["prediction"] == "NOT ENOUGH INFO"
     assert body["response"] == "Insufficient evidence."
+    assert body["low_confidence"] is True
 
 
 def test_rejects_bad_request(client_with):
   with client_with([5.0, 0.0, 0.0]) as client:
     assert client.post("/fact-check", json={"text": "no claim field"}).status_code == 422
+
+
+def test_response_shows_its_work(client_with):
+  with client_with([5.0, 0.0, 0.0]) as client:
+    body = client.post("/fact-check", json={"claim": "Tokyo is the capital of Japan"}).json()
+    assert body["evidence"] == [{"text": "tokyo is the capital of japan", "source": "Tokyo#0"}]
+    assert set(body["probabilities"]) == {"TRUE", "FALSE", "NOT ENOUGH INFO"}
+    assert abs(sum(body["probabilities"].values()) - 1) < 1e-5
+    assert body["confidence"] == max(body["probabilities"].values())
+    assert body["low_confidence"] is False and body["latency_ms"] >= 0
+
+
+def test_internal_errors_are_not_leaked(client_with, monkeypatch):
+  import claimscan.api.main as main
+  def boom(*a, **k):
+    raise RuntimeError("/secret/path/model.pt missing")
+  with client_with([5.0, 0.0, 0.0]) as client:
+    monkeypatch.setattr(main, "fact_check_detailed", boom)
+    r = client.post("/fact-check", json={"claim": "Tokyo is the capital of Japan"})
+    assert r.status_code == 500 and "secret" not in r.text

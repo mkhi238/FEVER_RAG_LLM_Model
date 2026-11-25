@@ -1,8 +1,9 @@
 """Single config root for ClaimScan.
 
 Values come from ``configs/default.yaml`` (or the file named by ``CLAIMSCAN_CONFIG``).
-``CLAIMSCAN_ARTIFACTS`` overrides ``artifacts_root``. Importing this module never
-creates directories; scripts that write output create their own.
+``CLAIMSCAN_ARTIFACTS`` overrides ``artifacts_root`` and ``CLAIMSCAN_RETRIEVER`` overrides
+``retriever.kind``. ``CLAIMSCAN_AGGREGATOR_ENABLED`` / ``_URL`` / ``_MODEL`` / ``_TIMEOUT`` / ``_API_KEY_ENV`` override
+``aggregator.*``. Importing this module never creates directories; scripts that write output create their own.
 
 The attribute names match the old ``rag/Verifier/config.py`` ``VerifierConfig`` so
 existing call sites (``config.corpus``, ``config.verifier_output_dir`` ...) keep working.
@@ -93,6 +94,13 @@ class ClaimScanConfig:
   rerank_openai_base_url: str = "https://api.openai.com/v1"
   rerank_openai_mode: str = "pointwise"
 
+  # rear aggregator (LLM veto over the verifier's verdict); see aggregator: in default.yaml
+  aggregator_enabled: bool = False
+  aggregator_base_url: str = "http://127.0.0.1:8083/v1"
+  aggregator_model: str = "gemma"
+  aggregator_timeout: float = 30.0
+  aggregator_api_key_env: str = ""   # NAME of the env var holding the key; "" = local llama-server
+
   @property
   def bm25_index_dir(self) -> Path:
     return self.bm25_dir / "index"
@@ -100,6 +108,12 @@ class ClaimScanConfig:
   @property
   def bm25_jsonl_dir(self) -> Path:
     return self.bm25_dir / "jsonl"
+
+  @property
+  def sentence_store(self) -> Path:
+    """SQLite (page, line) -> text store the API reads instead of the full corpus.
+    Build: python -m claimscan.evidence.store build"""
+    return self.data_processed / "fever_sentences.sqlite"
 
   @property
   def verifier_checkpoint(self) -> Path:
@@ -112,6 +126,11 @@ class ClaimScanConfig:
     return self.dense_indexes[name]
 
 
+def _env_bool(name: str, default: bool) -> bool:
+  v = os.environ.get(name)
+  return default if v is None else v.strip().lower() in ("1", "true", "yes", "on")
+
+
 def load_config(path: str | os.PathLike | None = None) -> ClaimScanConfig:
   path = Path(path or os.environ.get("CLAIMSCAN_CONFIG", DEFAULT_CONFIG_FILE))
   with open(path, "r", encoding="utf-8") as f:
@@ -122,6 +141,7 @@ def load_config(path: str | os.PathLike | None = None) -> ClaimScanConfig:
   r, v = raw["retriever"], raw["verifier"]
   bm25, hybrid = raw.get("bm25") or {}, raw.get("hybrid") or {}
   rr = raw.get("rerank") or {}
+  ag = raw.get("aggregator") or {}
   hf_home = raw.get("hf_home")
 
   cfg = ClaimScanConfig(
@@ -138,7 +158,7 @@ def load_config(path: str | os.PathLike | None = None) -> ClaimScanConfig:
     retriever_docids_file=r["docids_file"],
     retriever_nprobe=int(r["nprobe"]),
     retriever_mmap=bool(r.get("mmap", False)),
-    retriever_kind=str(r.get("kind", "faiss")),
+    retriever_kind=str(os.environ.get("CLAIMSCAN_RETRIEVER", r.get("kind", "faiss"))),
     bm25_dir=root / bm25.get("dir", "sparse/bm25_sentences"),
     bm25_k1=float(bm25.get("k1", 1.2)),
     bm25_b=float(bm25.get("b", 0.4)),
@@ -178,6 +198,11 @@ def load_config(path: str | os.PathLike | None = None) -> ClaimScanConfig:
     rerank_openai_model=str(rr.get("openai_model", "gpt-5-nano")),
     rerank_openai_base_url=str(rr.get("openai_base_url", "https://api.openai.com/v1")),
     rerank_openai_mode=str(rr.get("openai_mode", "pointwise")),
+    aggregator_enabled=_env_bool("CLAIMSCAN_AGGREGATOR_ENABLED", bool(ag.get("enabled", False))),
+    aggregator_base_url=str(os.environ.get("CLAIMSCAN_AGGREGATOR_URL", ag.get("base_url", "http://127.0.0.1:8083/v1"))),
+    aggregator_model=str(os.environ.get("CLAIMSCAN_AGGREGATOR_MODEL", ag.get("model", "gemma"))),
+    aggregator_timeout=float(os.environ.get("CLAIMSCAN_AGGREGATOR_TIMEOUT", ag.get("timeout", 30.0))),
+    aggregator_api_key_env=str(os.environ.get("CLAIMSCAN_AGGREGATOR_API_KEY_ENV", ag.get("api_key_env") or "")),
   )
 
   # Must happen before transformers / sentence_transformers are imported.

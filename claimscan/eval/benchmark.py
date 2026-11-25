@@ -225,12 +225,30 @@ def load_corpus_subset(pages: set, cfg=config) -> pd.DataFrame:
   return index_corpus(df)
 
 
+def load_decider(spec: str | None):
+  """'package.module:function' -> callable(claim, verdict) returning a label, or (label, ["Page#line", ...]).
+
+  The verdict is claimscan.pipeline.Verdict: the verifier's label/probs/evidence plus ``hits`` (all top-k
+  sentences with text). Lets an LLM layer be scored on exactly the same claims and metric as the verifier.
+  """
+  if not spec:
+    return None
+  import importlib
+  mod, _, fn = spec.partition(":")
+  if not fn:
+    raise ValueError(f"--decider must look like package.module:function, got {spec!r}")
+  return getattr(importlib.import_module(mod), fn)
+
+
 def e2e_stage(claims: pd.DataFrame, hits_by_name: dict[str, dict], out: Path, k: int, conf_threshold: float,
-              threads: int, services_factory=None, gold=None, cfg=config):
-  """fact_check_cleaned (unchanged) on cached hits for each retriever, scored with the FEVER metric."""
+              threads: int, services_factory=None, gold=None, cfg=config, decider=None):
+  """fact_check_cleaned (unchanged) on cached hits for each retriever, scored with the FEVER metric.
+
+  With ``decider`` (see load_decider) the final label comes from decider(claim, verdict) instead.
+  """
   from claimscan.eval.fever_eval import load_fever_metric, to_prediction, to_reference
   from claimscan.eval.gold import load_gold_sets
-  from claimscan.pipeline import Services, fact_check_cleaned, load_verifier
+  from claimscan.pipeline import Services, fact_check_cleaned, fact_check_detailed, load_verifier
 
   gold = load_gold_sets(claims["id"]) if gold is None else gold
   if services_factory is None:
@@ -251,7 +269,12 @@ def e2e_stage(claims: pd.DataFrame, hits_by_name: dict[str, dict], out: Path, k:
     preds, refs, times = [], [], []
     for row in claims.itertuples(index=False):
       t = time.perf_counter()
-      label, ev = fact_check_cleaned(row.claim, services, k=k, conf_threshold=conf_threshold, return_evidence=True)
+      if decider is None:
+        label, ev = fact_check_cleaned(row.claim, services, k=k, conf_threshold=conf_threshold, return_evidence=True)
+      else:
+        v = fact_check_detailed(row.claim, services, k=k, conf_threshold=conf_threshold)
+        res = decider(row.claim, v)
+        label, ev = res if isinstance(res, tuple) else (res, [d for _, d in v.evidence])
       times.append((time.perf_counter() - t) * 1000)
       preds.append(to_prediction(label, ev))
       refs.append(to_reference(row.label_text, gold.get(int(row.id), [])))
@@ -403,7 +426,7 @@ def log_to_mlflow(summary: dict, run_dir: Path, experiment: str | None = None, u
   params = {"n_claims": summary["n_claims"], "split": summary["split"], "seed": summary["seed"],
             "candidates": summary["candidates"], "nprobe": summary["nprobe"], "rrf_k": summary["rrf_k"],
             "e2e_k": summary["e2e_k"], "conf_threshold": summary["conf_threshold"],
-            "faiss_coverage_only": summary["faiss_coverage_only"]}
+            "faiss_coverage_only": summary["faiss_coverage_only"], "decider": summary.get("decider", "verifier")}
   with mlflow.start_run(run_name=f"benchmark-{summary['timestamp']}") as parent:
     mlflow.log_params(params)
     for name, r in summary["retrievers"].items():
@@ -429,7 +452,7 @@ def log_to_mlflow(summary: dict, run_dir: Path, experiment: str | None = None, u
 
 def run(n=300, retrievers=ALL_RETRIEVERS, seed=0, split="validation", candidates=None, e2e=True, e2e_k=30,
         conf_threshold=0.5, threads=2, latency_samples=5, faiss_coverage_only=True, chart_k=5,
-        mlflow_log=True, cfg=config) -> dict:
+        mlflow_log=True, cfg=config, decider: str | None = None) -> dict:
   candidates = candidates or cfg.hybrid_candidates
   cache = Path(cfg.eval_dir) / "cache"
   stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
@@ -480,7 +503,7 @@ def run(n=300, retrievers=ALL_RETRIEVERS, seed=0, split="validation", candidates
   summary = {"timestamp": stamp, "n_claims": len(claims), "split": split, "seed": seed, "claims_key": key,
              "k_list": list(K_LIST), "candidates": candidates, "nprobe": cfg.retriever_nprobe,
              "rrf_k": cfg.hybrid_rrf_k, "e2e_k": e2e_k, "conf_threshold": conf_threshold,
-             "faiss_coverage_only": faiss_coverage_only, "labels": claims["label_text"].value_counts().to_dict(),
+             "faiss_coverage_only": faiss_coverage_only, "decider": decider or "verifier", "labels": claims["label_text"].value_counts().to_dict(),
              "retrievers": {}}
   for r in retrievers:
     t = dict(timings[r])
@@ -492,11 +515,13 @@ def run(n=300, retrievers=ALL_RETRIEVERS, seed=0, split="validation", candidates
   summary["n_retrieval_claims"] = max((v["retrieval"].get("n", 0) for v in summary["retrievers"].values()), default=0)
 
   if e2e:
-    e2e_out = cache / "e2e" / f"{key}_c{candidates}_k{e2e_k}_t{conf_threshold}_{'-'.join(retrievers)}.json"
+    dtag = "" if not decider else "_d-" + "".join(ch if ch.isalnum() else "-" for ch in decider)
+    e2e_out = cache / "e2e" / f"{key}_c{candidates}_k{e2e_k}_t{conf_threshold}_{'-'.join(retrievers)}{dtag}.json"
     if not e2e_out.exists():
       run_subprocess(["_e2e", "--claims-file", str(claims_file), "--out", str(e2e_out), "--candidates", str(candidates),
                       "--k", str(e2e_k), "--conf-threshold", str(conf_threshold), "--threads", str(threads),
-                      "--retrievers", *retrievers], env_extra={"OMP_NUM_THREADS": str(threads)})
+                      "--retrievers", *retrievers] + (["--decider", decider] if decider else []),
+                     env_extra={"OMP_NUM_THREADS": str(threads)})
     e2e_res = json.loads(e2e_out.read_text())
     for r in retrievers:
       summary["retrievers"][r]["e2e"] = e2e_res.get(r)
@@ -552,6 +577,9 @@ def main(argv=None):
   ap.add_argument("--latency-samples", type=int, default=5)
   ap.add_argument("--all-claims", action="store_true", help="don't restrict to claims FAISS can answer")
   ap.add_argument("--no-mlflow", action="store_true")
+  ap.add_argument("--decider", default=None,
+                  help="package.module:function(claim, verdict) -> label; replaces the verifier's final decision "
+                       "(e.g. an LLM layer). Default: the verifier, unchanged")
 
   s = sub.add_parser("_select")
   s.add_argument("--n", type=int, required=True); s.add_argument("--seed", type=int, default=0)
@@ -567,6 +595,7 @@ def main(argv=None):
   s.add_argument("--candidates", type=int, default=100); s.add_argument("--k", type=int, default=30)
   s.add_argument("--conf-threshold", type=float, default=0.5); s.add_argument("--threads", type=int, default=2)
   s.add_argument("--retrievers", nargs="+", required=True)
+  s.add_argument("--decider", default=None)
 
   a = ap.parse_args(argv)
   if a.cmd == "_select":
@@ -575,10 +604,11 @@ def main(argv=None):
     retrieve_stage(a.retriever, pd.read_parquet(a.claims_file), Path(a.out), a.candidates, a.threads, a.latency_samples)
   elif a.cmd == "_e2e":
     claims = pd.read_parquet(a.claims_file)
-    e2e_stage(claims, _hits_for_e2e(claims, a.retrievers, a.candidates), Path(a.out), a.k, a.conf_threshold, a.threads)
+    e2e_stage(claims, _hits_for_e2e(claims, a.retrievers, a.candidates), Path(a.out), a.k, a.conf_threshold, a.threads,
+              decider=load_decider(a.decider))
   else:
     run(a.n, tuple(a.retrievers), a.seed, a.split, a.candidates, not a.no_e2e, a.k, a.conf_threshold, a.threads,
-        a.latency_samples, not a.all_claims, mlflow_log=not a.no_mlflow)
+        a.latency_samples, not a.all_claims, mlflow_log=not a.no_mlflow, decider=a.decider)
 
 
 if __name__ == "__main__":

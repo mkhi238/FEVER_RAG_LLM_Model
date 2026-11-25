@@ -215,3 +215,36 @@ def test_log_to_mlflow_creates_parent_and_nested_runs(tmp_path, monkeypatch):
   finally:
     import shutil
     shutil.rmtree(base, ignore_errors=True)
+
+
+def always_false(claim, verdict):
+  """Test decider: ignores the verifier, sees every hit."""
+  always_false.seen.append([h["text"] for h in verdict.hits])
+  return "FALSE"
+
+
+always_false.seen = []
+
+
+def test_e2e_stage_with_decider(tmp_path):
+  pytest.importorskip("evaluate")
+  from claimscan.evidence.select import index_corpus
+  from claimscan.pipeline import Services
+
+  corpus = index_corpus(pd.DataFrame({"id": ["A", "N"], "line": [0, 0], "text": ["A yes fact", "noise text"]}))
+  claims = pd.DataFrame({"id": [1], "claim": ["claim about A"], "label_text": ["FALSE"]})
+  decider = always_false
+  always_false.seen.clear()
+  res = B.e2e_stage(claims, {"good": {1: hits("A#0", "N#0")}}, tmp_path / "e2e.json", k=30, conf_threshold=0.5,
+                    threads=1, gold={1: [["A#0"]]}, decider=decider,
+                    services_factory=lambda r: Services(model=StubModel(), retriever=r, corpus_df=corpus))
+  assert res["good"]["label_accuracy"] == 1.0          # StubModel says TRUE; the decider's FALSE won
+  assert always_false.seen == [["A yes fact", "noise text"]]   # decider got all hits with text, best first
+
+
+def test_load_decider_rejects_bad_spec():
+  import os.path
+  assert B.load_decider(None) is None
+  assert B.load_decider("os.path:basename") is os.path.basename
+  with pytest.raises(ValueError):
+    B.load_decider("no_colon_here")
