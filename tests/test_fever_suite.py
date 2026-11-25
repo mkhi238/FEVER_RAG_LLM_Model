@@ -48,7 +48,7 @@ def balanced_slice(claims, n: int):
   return claims.iloc[keep].reset_index(drop=True)
 
 
-def _services_factory(cfg, B, all_fused: dict, base: dict, out_dir: Path, verifier: str = "ours"):
+def _services_factory(cfg, B, all_fused: dict, base: dict, out_dir: Path):
   """Verifier on 2 CPU threads + the corpus rows of every page in the 300 claims' top-k hybrid hits.
 
   The subset is cut from the 4 GB corpus once (the slow part, minutes on D:) and cached as a small parquet,
@@ -69,7 +69,7 @@ def _services_factory(cfg, B, all_fused: dict, base: dict, out_dir: Path, verifi
     corpus = B.load_corpus_subset(pages, cfg)
     out_dir.mkdir(parents=True, exist_ok=True)
     corpus.reset_index().to_parquet(path)
-  model = load_verifier(cfg, verifier)
+  model = load_verifier(cfg)
   return lambda retr: Services(model=model, retriever=retr, corpus_df=corpus)
 
 
@@ -84,7 +84,7 @@ def suite(request):
   base = json.loads(BASELINE_FILE.read_text())
   if not 1 <= n <= len(base["predictions"]):
     pytest.fail(f"--fever-claims must be 1..{len(base['predictions'])}, got {n}")
-  for p in (cfg.verifier_output_dir, cfg.sentence_store):
+  for p in (cfg.verifier_output_dir, cfg.corpus):
     if not Path(p).exists():
       pytest.skip(f"artifact missing: {p}")
 
@@ -116,41 +116,31 @@ def suite(request):
   t = time.perf_counter()
   retrieval = B.retrieval_metrics(fused, gold)
   out_dir = Path(cfg.eval_dir) / "fever_suite"
-  verifier = request.config.getoption("--verifier")
-  tag = "" if verifier == "ours" else "_" + verifier.replace("/", "__")   # other verifiers: own files
-  services_factory = _services_factory(cfg, B, all_fused, base, out_dir, verifier)
-  e2e = B.e2e_stage(claims, {RETRIEVER: fused}, out_dir / f"e2e_n{n}{tag}.json", k=base["k"],
+  services_factory = _services_factory(cfg, B, all_fused, base, out_dir)
+  e2e = B.e2e_stage(claims, {RETRIEVER: fused}, out_dir / f"e2e_n{n}.json", k=base["k"],
                     conf_threshold=base["conf_threshold"], threads=2, services_factory=services_factory,
                     gold=gold, cfg=cfg)[RETRIEVER]
-  preds = pd.read_parquet(out_dir / f"e2e_n{n}{tag}.predictions.parquet")
+  preds = pd.read_parquet(out_dir / f"e2e_n{n}.predictions.parquet")
   pred = {int(r.id): r.pred for r in preds.itertuples()}
   flips = [{"id": i, "gold": base["predictions"][str(i)]["gold"], "baseline": base["predictions"][str(i)]["pred"],
             "now": pred[i]} for i in ids if pred[i] != base["predictions"][str(i)]["pred"]]
 
   result = {"timestamp": datetime.now().isoformat(timespec="seconds"), "n_claims": n, "retriever": RETRIEVER,
-            "verifier": verifier,
             "labels": claims["label_text"].value_counts().to_dict(), "retrieval": retrieval, "e2e": e2e,
             "flips_vs_baseline": flips, "baseline": {"retrieval": base["retrieval"], "e2e": base["e2e"]},
             "wall_clock_s": round(time.perf_counter() - t, 1)}
   out_dir.mkdir(parents=True, exist_ok=True)
-  (out_dir / f"latest_n{n}{tag}.json").write_text(json.dumps(result, indent=2))
+  (out_dir / f"latest_n{n}.json").write_text(json.dumps(result, indent=2))
   return result, base
-
-
-def _skip_if_other_verifier(result):
-  if result["verifier"] != "ours":
-    pytest.skip(f"--verifier {result['verifier']}: the baseline is for our verifier; see latest_n<N>_<model>.json")
 
 
 def test_predictions_match_baseline(suite):
   result, _ = suite
-  _skip_if_other_verifier(result)
   assert len(result["flips_vs_baseline"]) <= MAX_FLIPS, result["flips_vs_baseline"]
 
 
 def test_fever_metric_matches_baseline(suite):
   result, base = suite
-  _skip_if_other_verifier(result)
   if result["n_claims"] != len(base["predictions"]):
     pytest.skip("baseline FEVER metric is for the full 300-claim sample")
   tol = MAX_FLIPS / result["n_claims"] + 1e-9
@@ -180,6 +170,24 @@ def test_retrieval_matches_baseline(suite):
 #
 # Writes <eval_dir>/fever_suite/latest_oracle.json (ours) or latest_oracle_<model>.json (a HuggingFace NLI model).
 
+NLI_TO_FEVER = {"entailment": "TRUE", "contradiction": "FALSE", "neutral": "NOT ENOUGH INFO"}
+
+
+def _hf_nli_verifier(name: str):
+  """(claim, evidence) -> label with an off-the-shelf NLI model: premise = evidence, hypothesis = claim."""
+  import torch
+  from transformers import AutoModelForSequenceClassification, AutoTokenizer
+  tok = AutoTokenizer.from_pretrained(name)
+  model = AutoModelForSequenceClassification.from_pretrained(name).eval()
+  labels = {i: NLI_TO_FEVER[l.lower()] for i, l in model.config.id2label.items()}
+
+  def predict(claim, evidence):
+    enc = tok(" ".join(evidence), claim, truncation=True, max_length=512, return_tensors="pt")
+    with torch.no_grad():
+      return labels[int(model(**enc).logits.argmax(-1))]
+  return predict
+
+
 def _load_checkpoint(path: str):
   """Our FEVERVerifier from another checkpoint (e.g. a retrained verifier/deberta_v2/trained_model/model.pt)."""
   import torch
@@ -199,7 +207,7 @@ def gold_evidence_run(request):
   from claimscan.evidence.select import _lookup_text, index_corpus
   from claimscan.pipeline import load_verifier, verify
 
-  for p in (cfg.verifier_checkpoint, cfg.sentence_store):
+  for p in (cfg.verifier_checkpoint, cfg.corpus):
     if not Path(p).exists():
       pytest.skip(f"artifact missing: {p}")
   base = json.loads(BASELINE_FILE.read_text())
@@ -231,8 +239,11 @@ def gold_evidence_run(request):
     corpus.reset_index().to_parquet(path)
   torch.set_num_threads(2)
   name = request.config.getoption("--verifier")
-  model = _load_checkpoint(name) if name.endswith(".pt") else load_verifier(cfg, name)
-  predict = lambda claim, evidence: verify(model, claim, evidence)[0]
+  if name == "ours" or name.endswith(".pt"):
+    model = load_verifier(cfg) if name == "ours" else _load_checkpoint(name)
+    predict = lambda claim, evidence: verify(model, claim, evidence)[0]
+  else:
+    predict = _hf_nli_verifier(name)
 
   t = time.perf_counter()
   rows = []
