@@ -7,11 +7,19 @@ def pytest_addoption(parser):
                    help="claims for the gold-evidence test: 'validation' (the suite's) or 200 TRUE/FALSE train claims")
 
 
+def _deselect(config, items, marker):
+  drop = [i for i in items if marker in i.keywords]
+  if drop:
+    config.hook.pytest_deselected(items=drop)
+    items[:] = [i for i in items if marker not in i.keywords]
+
+
 def pytest_collection_modifyitems(config, items):
-  """The slow FEVER suite runs only when tests/test_fever_suite.py is named (or with -m fever_suite)."""
-  if any("test_fever_suite" in a for a in config.args) or "fever_suite" in (config.getoption("-m") or ""):
-    return
-  keep = [i for i in items if "fever_suite" not in i.keywords]
-  if len(keep) < len(items):
-    config.hook.pytest_deselected(items=[i for i in items if "fever_suite" in i.keywords])
-    items[:] = keep
+  """The slow FEVER suite runs only when tests/test_fever_suite.py is named (or with -m fever_suite).
+  Its gold-evidence measurement (~200 claims) is not part of /fever-10 or /fever-300: it runs only when
+  asked for with -k gold_evidence or -m gold_evidence."""
+  asked = (config.getoption("-k") or "") + " " + (config.getoption("-m") or "")
+  if "gold_evidence" not in asked:
+    _deselect(config, items, "gold_evidence")
+  if not (any("test_fever_suite" in a for a in config.args) or "fever_suite" in (config.getoption("-m") or "")):
+    _deselect(config, items, "fever_suite")

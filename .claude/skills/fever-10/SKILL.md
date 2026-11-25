@@ -24,7 +24,7 @@ corpus (a few minutes); after that it takes about a minute. No GPU, no retrieval
 
 Read `<artifacts>/eval/fever_suite/latest_n10.json` (artifacts = `/mnt/d/crisis-claim-analysis/artifacts`):
 
-- pytest line. Expect `1 passed, 2 skipped`, because the metric-vs-baseline tests only apply at 300 claims.
+- pytest line. Expect `1 passed, 2 skipped, 1 deselected` (the deselected one is the gold-evidence measurement, run separately), because the metric-vs-baseline tests only apply at 300 claims.
 - `flips_vs_baseline`: count, and each claim id with gold / baseline / current prediction. 0 is expected, and the test fails above 1.
 - `label_accuracy` and `fever_score` on the 10 claims. Too few claims to compare with the 300-claim numbers, so say so.
 - `wall_clock_s`

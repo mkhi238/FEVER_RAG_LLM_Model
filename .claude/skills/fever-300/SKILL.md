@@ -28,7 +28,7 @@ Compute, kept low on purpose:
 
 Read `<artifacts>/eval/fever_suite/latest_n300.json` (artifacts = `/mnt/d/crisis-claim-analysis/artifacts`):
 
-- pytest line: `X passed, Y failed, Z skipped in T s`
+- pytest line: `X passed, Y failed, Z skipped, 1 deselected in T s` (the deselected one is the gold-evidence measurement, run separately with `-k gold_evidence`)
 - end to end: `label_accuracy`, `fever_score`, `evidence_f1` next to `baseline.e2e`
 - retrieval: `recall_set@5/@10/@50` and `mrr` next to `baseline.retrieval`
 - `flips_vs_baseline`: count, and for each one the claim id, gold label, baseline prediction and current prediction
