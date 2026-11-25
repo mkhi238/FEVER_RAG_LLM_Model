@@ -22,6 +22,6 @@ include = ["claimscan*"]
 testpaths = ["tests"]
 # In-memory capture: pytest's default tmpfile capture fails on the WSL D:/E: (drvfs) mounts.
 # The FEVER claim suite (tests/test_fever_suite.py) needs the artifacts and minutes of CPU, so it only runs
-# when asked: python -m pytest -m fever_suite tests/test_fever_suite.py [--fever-claims 10]
-addopts = '--capture=sys -m "not fever_suite"'
+# when the file is named: pytest tests/test_fever_suite.py [--fever-claims 10] (tests/conftest.py)
+addopts = "--capture=sys"
 markers = ["fever_suite: end-to-end FEVER claim suite on the artifacts (deselected by default)"]

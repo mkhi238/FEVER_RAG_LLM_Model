@@ -2,10 +2,10 @@
 ``hybrid_norm3``) end to end on the 300-claim benchmark sample.
 
 Not part of the unit tests: it needs the artifacts (cached hits, gold, corpus, verifier checkpoint), so it is
-deselected by default (``-m "not fever_suite"`` in pyproject) and run explicitly:
+skipped by a plain `pytest` (tests/conftest.py) and run by naming the file:
 
-    python -m pytest -m fever_suite tests/test_fever_suite.py                    # 300 claims (/fever-300)
-    python -m pytest -m fever_suite tests/test_fever_suite.py --fever-claims 10  # fast (/fever-10)
+    pytest tests/test_fever_suite.py                     # 300 claims (/fever-300)
+    pytest tests/test_fever_suite.py --fever-claims 10   # fast (/fever-10)
 
 Compute: retrieval is NOT rerun. Both sizes read the FAISS and BM25 (no RM3) hits that the benchmark cached for the
 300-claim sample (<eval_dir>/cache/hits), fuse them exactly as the benchmark does, and rerun only the
@@ -154,3 +154,124 @@ def test_retrieval_matches_baseline(suite):
     pytest.skip("baseline retrieval metrics are for the full 300-claim sample")
   for m, v in base["retrieval"].items():
     assert result["retrieval"][m] == pytest.approx(v, abs=1e-9), m
+
+
+# --- Verifier with gold evidence --------------------------------------------------------------------------------
+# Measures the DeBERTa verifier on its own: the suite's TRUE/FALSE claims (NEI claims have no gold evidence) get the
+# gold sentences (first FEVER evidence set, at most 3) instead of retrieved ones. Compared with the suite's own
+# accuracy on the same claims, read from the baseline file. A measurement, not an accuracy check:
+#
+#     pytest tests/test_fever_suite.py -k gold_evidence -s
+#
+#     pytest tests/test_fever_suite.py -k gold_evidence --verifier MoritzLaurer/DeBERTa-v3-base-mnli-fever-anli
+#     pytest tests/test_fever_suite.py -k gold_evidence --verifier <dir>/trained_model/model.pt   # another checkpoint
+#     add --gold-split train for 200 TRUE/FALSE train claims instead of the suite's (a leakage check)
+#
+# Writes <eval_dir>/fever_suite/latest_oracle.json (ours) or latest_oracle_<model>.json (a HuggingFace NLI model).
+
+NLI_TO_FEVER = {"entailment": "TRUE", "contradiction": "FALSE", "neutral": "NOT ENOUGH INFO"}
+
+
+def _hf_nli_verifier(name: str):
+  """(claim, evidence) -> label with an off-the-shelf NLI model: premise = evidence, hypothesis = claim."""
+  import torch
+  from transformers import AutoModelForSequenceClassification, AutoTokenizer
+  tok = AutoTokenizer.from_pretrained(name)
+  model = AutoModelForSequenceClassification.from_pretrained(name).eval()
+  labels = {i: NLI_TO_FEVER[l.lower()] for i, l in model.config.id2label.items()}
+
+  def predict(claim, evidence):
+    enc = tok(" ".join(evidence), claim, truncation=True, max_length=512, return_tensors="pt")
+    with torch.no_grad():
+      return labels[int(model(**enc).logits.argmax(-1))]
+  return predict
+
+
+def _load_checkpoint(path: str):
+  """Our FEVERVerifier from another checkpoint (e.g. a retrained verifier/deberta_v2/trained_model/model.pt)."""
+  import torch
+  from claimscan.verifier.deberta_verifier import FEVERVerifier
+  model = FEVERVerifier()
+  model.load_state_dict(torch.load(path, map_location="cpu"))
+  return model.eval()
+
+
+@pytest.fixture(scope="module")
+def gold_evidence_run(request):
+  pd = pytest.importorskip("pandas")
+  import torch
+  from claimscan.config import config as cfg
+  from claimscan.eval import benchmark as B
+  from claimscan.eval.gold import load_claims, load_gold_sets
+  from claimscan.evidence.select import _lookup_text, index_corpus
+  from claimscan.pipeline import load_verifier, verify
+
+  for p in (cfg.verifier_checkpoint, cfg.corpus):
+    if not Path(p).exists():
+      pytest.skip(f"artifact missing: {p}")
+  base = json.loads(BASELINE_FILE.read_text())
+  claims_file = Path(cfg.eval_dir) / "cache" / base["claims_file"]
+  if not claims_file.exists():
+    pytest.skip(f"claim sample missing: {claims_file} (run the full suite once)")
+  sample = pd.read_parquet(claims_file)
+  assert B.claims_key(sample["id"]) == base["claims_key"], "claim sample differs from the baseline's"
+
+  split = request.config.getoption("--gold-split")
+  if split == "validation":
+    gold = load_gold_sets(sample["id"])
+    claims = sample[sample["id"].astype(int).isin(gold.keys())]
+  else:  # 200 TRUE/FALSE train claims (seen by FEVER-NLI models): 100 per label, seed 0, with gold evidence
+    pool = load_claims("train")
+    pool = pool[pool["label_text"] != "NOT ENOUGH INFO"].sample(frac=1, random_state=0)
+    gold = load_gold_sets(pool["id"])
+    pool = pool[pool["id"].isin(gold.keys())]
+    claims = pd.concat([g.head(100) for _, g in pool.groupby("label_text")])
+    gold = {int(i): gold[int(i)] for i in claims["id"]}
+  # gold sentences cut from the 4 GB corpus once (minutes on D:) and cached, like the suite's corpus subset
+  out_dir = Path(cfg.eval_dir) / "fever_suite"
+  path = out_dir / (f"corpus_{base['claims_key']}_gold.parquet" if split == "validation" else "corpus_train200_gold.parquet")
+  if path.exists():
+    corpus = index_corpus(pd.read_parquet(path))
+  else:
+    corpus = B.load_corpus_subset({d.rsplit("#", 1)[0] for sets in gold.values() for d in sets[0][:3]}, cfg)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    corpus.reset_index().to_parquet(path)
+  torch.set_num_threads(2)
+  name = request.config.getoption("--verifier")
+  if name == "ours" or name.endswith(".pt"):
+    model = load_verifier(cfg) if name == "ours" else _load_checkpoint(name)
+    predict = lambda claim, evidence: verify(model, claim, evidence)[0]
+  else:
+    predict = _hf_nli_verifier(name)
+
+  t = time.perf_counter()
+  rows = []
+  for c in claims.itertuples():
+    cid = int(c.id)
+    docids = gold[cid][0][:3]
+    hits = [{"id": d.rsplit("#", 1)[0], "line": int(d.rsplit("#", 1)[1])} for d in docids]
+    evidence = [s for s in (_lookup_text(corpus, h["id"], h["line"]) for h in hits) if s is not None]
+    pred = predict(c.claim, evidence) if evidence else None
+    rows.append({"id": cid, "gold": c.label_text, "pred_gold_evidence": pred,
+                 "pred_suite": base["predictions"][str(cid)]["pred"] if split == "validation" else None, "evidence": docids,
+                 "sentences_found": len(evidence)})
+
+  scored = [r for r in rows if r["pred_gold_evidence"] is not None]
+  acc = lambda key: round(sum(r[key] == r["gold"] for r in scored) / len(scored), 4)
+  result = {"timestamp": datetime.now().isoformat(timespec="seconds"), "verifier": name, "split": split,
+            "claims": len(rows), "claims_scored": len(scored),
+            "accuracy_gold_evidence": acc("pred_gold_evidence"),
+            "accuracy_suite_retrieved_evidence": acc("pred_suite") if split == "validation" else None,
+            "wall_clock_s": round(time.perf_counter() - t, 1), "per_claim": rows}
+  tag = Path(name).parent.parent.name if name.endswith(".pt") else name.replace("/", "__")
+  out_name = "latest_oracle.json" if name == "ours" else f"latest_oracle_{tag}.json"
+  if split != "validation":
+    out_name = out_name.replace(".json", f"_{split}.json")
+  (out_dir / out_name).write_text(json.dumps(result, indent=2))
+  print(f"\nverifier on {len(scored)} TRUE/FALSE {split} claims: gold evidence {result['accuracy_gold_evidence']:.1%}")
+  return result
+
+
+def test_verifier_with_gold_evidence(gold_evidence_run):
+  r = gold_evidence_run
+  assert r["claims_scored"] > 0.9 * r["claims"], f"gold sentences missing from the corpus for many claims: {r}"
