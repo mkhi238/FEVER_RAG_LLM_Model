@@ -115,7 +115,7 @@ so the benchmark numbers in `graphs/` describe this endpoint. Interactive docs: 
 
 ## Resources
 
-- **RAM:** ~4.5 GB with the default `hybrid` (~2 GB for the memory-mapped FAISS index + DeBERTa + bge-small,
+- **RAM:** ~5.5 GB with the default `hybrid` (5.4 GB RSS measured 2026-11-25) (~2 GB for the memory-mapped FAISS index + DeBERTa + bge-small,
   plus ~2.5 GB for BM25's JVM); ~2 GB with `faiss`. Add ~3 GB for `llama` with a 4B Q4_K_M model at ctx 8192. Docker Desktop's WSL VM
   must be allowed that much (the machine has 15 GB).
 - **First request is slow** (~25 s for FAISS; cold BM25 queries took 6-11 s with RM3, less without) while the

@@ -2,11 +2,11 @@
 # Wait for the ClaimScan api container to be healthy, then smoke-test it.
 # Adapted from wrsmith108/docker-claude-skill's health script: wait on the Docker healthcheck, fall back to a direct probe.
 #
-#   .claude/skills/dockerfile/docker-health.sh [max_wait_s=420] [port=8000]
+#   .claude/skills/dockerfile/docker-health.sh [max_wait_s=1800] [port=8000]
 #
 # Run from the repo root (where docker-compose.yml is). Exit 0 = healthy and all smoke claims answered.
 set -u
-MAX=${1:-420}
+MAX=${1:-1800}
 PORT=${2:-${API_PORT:-8000}}
 URL="http://localhost:$PORT"
 
@@ -18,7 +18,7 @@ probe() { curl -sf "$URL/health" 2>/dev/null | python3 -c "import json,sys; sys.
 check_docker
 [ -n "$(cid)" ] || { echo "FAIL: api container not running (docker compose up -d api)"; exit 2; }
 
-echo "waiting up to ${MAX}s for the api (models load in ~1-5 min; the healthcheck start period is 300 s)"
+echo "waiting up to ${MAX}s for the api (cold start from D: can take 5-20 min (measured 19 min); healthcheck start period 1500 s)"
 t0=$(date +%s); status=""
 while :; do
   status=$(health)

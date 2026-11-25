@@ -55,11 +55,11 @@ Deps are installed before the code is copied, so code-only rebuilds reuse the pi
 
 ```bash
 docker compose up -d api                             # hybrid retriever, rear aggregator OFF
-.claude/skills/dockerfile/docker-health.sh           # waits for healthy (<=7 min), 3 smoke claims, uid, ro mount, RAM
+.claude/skills/dockerfile/docker-health.sh           # waits for healthy (<=30 min; cold start measured 19 min), 3 smoke claims, uid, ro mount, RAM
 docker compose down
 ```
 
-`docker-health.sh` waits on the container's HEALTHCHECK (`/health` → `models_loaded`, start period 300 s). It
+`docker-health.sh` waits on the container's HEALTHCHECK (`/health` → `models_loaded`, start period 1500 s; a cold start reading the indexes from D: took 19 min, warm requests ~3-9 s). It
 falls back to probing `/health` directly, then POSTs a likely-TRUE, a likely-FALSE and a likely-NEI claim. It
 checks the HTTP status and response shape, not the verdict: the verifier is imperfect, and the benchmark covers
 accuracy (`/fever-300`).
@@ -98,12 +98,12 @@ accuracy (`/fever-300`).
 |---|---|
 | `error during connect ... dockerDesktopLinuxEngine` | Docker Desktop isn't running. Start it. |
 | `docker: command not found` in WSL | Docker Desktop → Settings → Resources → WSL Integration → enable Ubuntu. Don't use `docker.exe` from WSL: it can't read `/mnt/d` bind mounts. |
-| Container exits or is OOM-killed while loading | The WSL VM needs ~4.5 GB for `hybrid` (BM25's JVM ~2.5 GB). Raise the VM memory, or run `CLAIMSCAN_RETRIEVER=faiss`. |
+| Container exits or is OOM-killed while loading | The WSL VM needs ~5.5 GB for `hybrid` (measured 5.4 GB RSS) (BM25's JVM ~2.5 GB). Raise the VM memory, or run `CLAIMSCAN_RETRIEVER=faiss`. |
 | `fever_sentences.sqlite missing` in the logs | Build the sentence store (pre-flight). |
 | `OSError ... offline mode` / model not found | The HF cache mount is missing a model. Check `HF_CACHE_HOST` has bge-small-en-v1.5 and deberta-v3-base under `hub/`. |
 | `JavaException` / pyserini import error | The image was built with `WITH_BM25=0` but is running hybrid/bm25. Rebuild with the default, or run faiss. |
 | First request takes 10-30 s | Normal: the FAISS/BM25 indexes are paging in from D:. Later requests take a few seconds. |
-| Port 8000 in use | `API_PORT=8001 docker compose up -d api` (and `docker-health.sh 420 8001`) |
+| Port 8000 in use | `API_PORT=8001 docker compose up -d api` (and `docker-health.sh 1800 8001`) |
 | Unhealthy but `/health` responds | `models_loaded` is false: read `docker compose logs api` for the load error. |
 
 ## Report
