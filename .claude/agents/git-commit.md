@@ -1,7 +1,7 @@
 ---
 name: git-commit
 description: Commits everything in the FEVER/ClaimScan working tree to git as a few logical commits (excluding secrets, large binaries and files the repo deliberately keeps untracked). Use when asked to commit, save or check in the work.
-model: sonnet
+model: haiku
 tools: Read, Bash
 ---
 

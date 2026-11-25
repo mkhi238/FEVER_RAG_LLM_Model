@@ -26,6 +26,21 @@ python scripts/verifier_smoke.py
 - `HF_HOME` in the user's shell is `/mnt/d/whisper_v2/hf_cache` (on D:, fine; it wins over `hf_home` in config).
 - Git remote is SSH and works: `git push` is fine when the user asks.
 
+## Serving + graphs (2026-11-24)
+- API serves `pipeline.fact_check_detailed` (same logic as `fact_check_cleaned`, k=30, 0.5), so benchmark numbers = API behaviour. Keep it that way.
+- API reads sentence text from the SQLite store (`python -m claimscan.evidence.store build`), never the 4 GB corpus. `docker/README.md` for the image (artifacts + HF cache mounted read-only).
+- `graphs/` is generated: `/graphs` skill or `python -m claimscan.graph.make_graphs`; never hand-edit it. A Stop hook (`.claude/hooks/graphs_if_stale.sh`) rebuilds it in the background when an eval result is newer.
+- Publishing: only working end-to-end parts go to `main` (merged from a separate `ship` branch built in its own worktree,
+  never by switching branches in the shared checkout). Shipped 2026-11-25: API + SQLite store + Docker, hybrid retriever,
+  rear aggregator (`aggregation.py`, `instruct/{schemas,model,rear_aggregator}.py`, off by default, fails open), graph, `.claude/`.
+  Still `refactor`-only: agents, rerank, llm, serve, `instruct/{front_decomposer,prompts}.py`, most of `llamacpp/`, `scripts/e2e_cpu_eval.py`.
+- Shipped retriever default: `retriever.kind: hybrid` with `bm25.rm3: false` (benchmark name `hybrid_norm3`). 300 claims, k=30:
+  label acc 0.51, FEVER 0.38. The FEVER claim suite (`/fever-300`, `/fever-10`) checks it per claim. The user's reference number is
+  64.5% (an N=30 trial, not saved); the recall/testing method is being redone.
+- Rear aggregator veto: fixed in `rear_aggregator.final_label` (verifier conf < 0.6 or LLM conf >= 0.9), not configurable.
+  Hosted LLM: `aggregator.api_key_env` names the env var holding the key (never the key itself).
+- Future direction (settled): a paper-reading helper. Highlight a term, get a grounded 1-2 sentence RAG definition.
+
 ## Working style
 - The user writes the **llama.cpp parts themselves** (`llamacpp/`, `claimscan/llm/`) with Claude reviewing/assisting.
   Don't implement those unless asked. Walkthrough: `llamacpp/README.md`.
@@ -35,7 +50,7 @@ python scripts/verifier_smoke.py
 ## Open jobs
 1. **Hybrid BM25 + FAISS retriever (RRF k=60): code done and Lucene index built (2026-11-12).**
    - Lucene index BUILT 2026-11-12: 25,246,092 docs, 4.3 GB, 23 min (`-Xmx2g`, `--memory-buffer 512`; the 4 GB default OOMs).
-     Cold BM25+RM3 queries take 6–11 s. Remaining: compare recall@k, check whether RM3 helps, decide on the `retriever.kind` default.
+     Cold BM25+RM3 queries take 6–11 s. DECIDED 2026-11-25: RM3 off (better and ~17x faster), default `hybrid`.
    - The stored bge FAISS index is **L2** (lower = better). Hybrid `score` = 1/rrf to match. Evidence scoring now uses rank, not score
      (`claimscan/neurosymbolic_layer/`, which replaced `evidence/scoring.py` on 2026-11-12).
      But `faiss_indexer.py` builds `IndexFlatIP`, so a rebuild would flip the score direction.
@@ -46,6 +61,7 @@ python scripts/verifier_smoke.py
 4. **Next (when the user's RL training is off the machine):** `python -m claimscan.eval.eval_retriever --retriever faiss bm25 hybrid`,
    then `python -m claimscan.eval.fever_eval --max-claims 200`; then fix line-0 in `verifier/prepare.py` and retrain.
    `claimscan/instruct/` (front decomposer / rear aggregator, LangChain) is the user's; help only if asked.
+   Front decomposer: keep it to splitting text into claims; query writing is the RL-trained research agent's job.
 
 ## Eval (`claimscan/eval/`, 2026-11-12)
 - `metrics/fever/` = the user's FEVER metric from huggingface/evaluate PR #710 (merged), vendored unchanged and loaded with
