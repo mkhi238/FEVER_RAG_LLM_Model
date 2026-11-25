@@ -1,7 +1,9 @@
 """Pydantic shapes passed between the front, the verifier loop and the rear.
 
-Flow: user text -> FrontOutput (front_decomposer) -> one ClaimResult per claim (verifier loop)
--> RearInput -> RearOutput (rear_aggregator). Use with llm.with_structured_output(Model).
+Flow: user text -> FrontOutput (front_decomposer) -> one ClaimResult per claim (verifier)
+-> RearInput -> RearOutput (rear_aggregator).
+FrontOutput is an LLM output schema (with_structured_output). The rest are built in code. The rear LLM's own
+output schema is VetoOutput in rear_aggregator.py.
 """
 from typing import Literal
 
@@ -41,11 +43,14 @@ class RearInput(BaseModel):
 
 # ---- Rear ----
 class ClaimVerdict(BaseModel):
-  """The rear's explanation for one claim."""
+  """The rear's explanation for one claim. verdict is the verifier's label, or NEI if the veto was applied."""
   claim: str
-  verdict: Label | Literal["UNCLEAR"]            # UNCLEAR when no label is clearly ahead
-  confidence: float = Field(ge=0, le=1)          # usually the top prob from the verifier
+  verdict: Label
+  confidence: float = Field(ge=0, le=1)          # the verifier's top prob
   explanation: str = Field(description="1-3 sentences, citing evidence as [page:line]")
+  veto: bool = False                             # True only if the veto was APPLIED (verdict downgraded to NEI)
+  veto_reason: str = ""                          # copied from the LLM, even when the veto was not applied
+  llm_confidence: float | None = Field(None, ge=0, le=1)   # LLM's confidence that the claim is unfactual
 
 
 class RearOutput(BaseModel):

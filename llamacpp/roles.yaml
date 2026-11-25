@@ -24,14 +24,30 @@ roles:
     n_gpu_layers: 99
     reranking: true
 
+  # Front: ONE llama-server running Qwen3.5-9B (dense, not MoE; Qwen's smallest MoE is 35B-A3B).
+  # Q4_K_M ~5.5 GB: some layers on the GPU, the rest in RAM. The decomposer reuses this server.
+  # Not built yet; the aggregator (rear) runs its own Gemma server below.
   front_facer:
-    backend: hosted       # 30B-A3B MoE needs ~16 GB free RAM; this machine has 15 GB total
-    base_url: TODO
-    model: TODO
-    api_key_env: CLAIMSCAN_FRONT_API_KEY
+    backend: llamacpp
+    model: TODO-Qwen3.5-9B-Q4_K_M.gguf   # check the exact file name in unsloth/Qwen3.5-9B-GGUF
+    port: 8085
+    ctx: 8192
+    n_gpu_layers: TODO                # raise until VRAM is full (the research agent + reranker need ~3 GB too)
+    jinja: true                       # use the model's own chat template
+    enable_thinking: false            # if Qwen3.5 thinks by default, turn it off so JSON output stays clean
+                                      # (per request: chat_template_kwargs={"enable_thinking": false})
 
   decomposer:
-    backend: hosted       # same model as front_facer, second role (own prompt, JSON output)
-    base_url: TODO
-    model: TODO
-    api_key_env: CLAIMSCAN_FRONT_API_KEY
+    backend: llamacpp
+    shares: front_facer               # same server/port; JSON output via response_format json_schema
+
+  # Rear: Gemma reads the verifier's verdict + evidence and may veto it to NEI (claimscan/instruct/rear_aggregator.py).
+  # Port 8083 = aggregator.base_url in configs/default.yaml and LLAMA_PORT in docker-compose.yml; keep them in sync.
+  aggregator:
+    backend: llamacpp
+    model: TODO-gemma-3-4b-it-Q4_K_M.gguf   # ~2.5 GB; gemma-3-1b-it is the CPU-only fallback
+    port: 8083
+    ctx: 4096                         # top-5 evidence + prompt + a short JSON answer fit easily
+    n_gpu_layers: TODO                # 99 if VRAM is free, else lower (0 = CPU only)
+    jinja: true                       # Gemma's own chat template (it folds the system prompt into the first user turn)
+                                      # JSON output: response_format json_schema, sent by LangChain's with_structured_output

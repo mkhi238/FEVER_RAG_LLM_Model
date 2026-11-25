@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Start llama-server for one role from llamacpp/roles.yaml.   (YOU: fill in the TODOs)
-# Usage: llamacpp/scripts/serve.sh research_agent|reranker
+# Usage: llamacpp/scripts/serve.sh research_agent|reranker|aggregator|front_facer
 set -euo pipefail
 
 ROLE="${1:?usage: $0 <role>}"
@@ -15,6 +15,8 @@ ROLES="$REPO/llamacpp/roles.yaml"
 #         + --grammar-file <grammar>  if grammar is set
 #         + --reranking               if reranking: true
 #         + --lora <path>             if lora is set
+#         + --jinja                   if jinja: true (aggregator/front: use the model's chat template)
+#         A role with `shares:` has no server of its own; refuse it and name the role to start instead.
 
 # TODO 3: exec it, and print the base URL (http://127.0.0.1:<port>/v1) the client will use.
 
