@@ -1,0 +1,22 @@
+# Everything beyond the runtime: training, evaluation, BM25, graphs, tests and the experimental
+# LLM / agent stack. Lower bounds = versions verified in .venv (2026-11-24).
+#   pip install -r requirements-dev.txt     (or: uv pip install -r requirements-dev.txt)
+-r requirements.txt
+
+# --- training / data prep
+scikit-learn>=1.9.1             # verifier/train.py, scripts/run_experiments.py
+datasets>=5.2                   # claimscan/data/* (FEVER from the HF hub), vendored FEVER metric
+tqdm>=4.70
+
+# --- evaluation / tracking / graphs
+evaluate>=0.4.6                 # loads the vendored FEVER metric (claimscan/eval/metrics/fever)
+mlflow>=3.18
+matplotlib>=3.11
+
+# --- LLM orchestration (front facer / decomposer / agent graph, rerank backends)
+langchain>=1.5,<2
+langgraph>=1.2,<2
+httpx>=0.28                     # LLM role client and rerank backends; also FastAPI's TestClient
+
+# --- tests
+pytest>=9.2

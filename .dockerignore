@@ -1,0 +1,14 @@
+# Whitelist: only what the image COPYs goes into the build context (never the repo's PNGs, notes,
+# PDFs, .venv or artifacts).
+*
+!Dockerfile
+!requirements.txt
+!docker/constraints.txt
+!configs/
+!claimscan/
+# secrets never enter the build context (already excluded by *, listed so it stays that way)
+.env
+.env.*
+**/__pycache__
+**/*.py[cod]
+claimscan/**/*.png

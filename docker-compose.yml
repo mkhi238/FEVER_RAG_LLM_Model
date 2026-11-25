@@ -1,0 +1,75 @@
+# ClaimScan: the fact-check API, plus an optional llama-server for the rear aggregator.
+#
+#   docker compose up --build -d                     # api only (aggregator OFF; no llama service, no GGUF needed)
+#   CLAIMSCAN_AGGREGATOR_ENABLED=1 docker compose --profile aggregator up --build -d   # api + llama
+#
+# Every host path / model name below can be overridden from the shell or a .env file next to this
+# file (.env is git-ignored). See docker/README.md.
+
+services:
+  api:
+    build:
+      context: .
+      args:
+        WITH_BM25: ${WITH_BM25:-1}            # Java 21 + pyserini for hybrid / bm25; 0 = faiss-only image
+    image: claimscan-api
+    init: true
+    ports:
+      - "${API_PORT:-8000}:8000"
+    volumes:
+      # whole artifacts root, read-only. CLAIMSCAN_ARTIFACTS=/artifacts (Dockerfile), so config resolves
+      # FAISS -> /artifacts/dense/faiss_bge_small_en_v1_5, BM25 Lucene index -> /artifacts/sparse/bm25_sentences/index
+      # (bm25.dir in configs/default.yaml), sentence store -> /artifacts/data/processed/fever_sentences.sqlite
+      - ${CLAIMSCAN_ARTIFACTS_HOST:-/mnt/d/crisis-claim-analysis/artifacts}:/artifacts:ro
+      - ${HF_CACHE_HOST:-/mnt/d/huggingface_cache}:/hf:ro
+    environment:
+      CLAIMSCAN_RETRIEVER: ${CLAIMSCAN_RETRIEVER:-hybrid}   # shipped default (FAISS + BM25, no RM3); faiss = low-memory
+      # Rear aggregator: OFF unless set to 1. It fails open (verifier verdict returned) if its server is
+      # down, so the api never depends on the llama service (no depends_on): with a hosted model
+      # (CLAIMSCAN_AGGREGATOR_URL=https://...) the llama profile isn't needed at all.
+      CLAIMSCAN_AGGREGATOR_ENABLED: ${CLAIMSCAN_AGGREGATOR_ENABLED:-0}
+      CLAIMSCAN_AGGREGATOR_URL: ${CLAIMSCAN_AGGREGATOR_URL:-http://llama:8080/v1}
+      CLAIMSCAN_AGGREGATOR_TIMEOUT: ${CLAIMSCAN_AGGREGATOR_TIMEOUT:-30}
+      # No value = passed through from the shell / .env only when set there, otherwise left unset in the
+      # container (so configs/default.yaml's aggregator.model / api_key_env apply instead of "").
+      CLAIMSCAN_AGGREGATOR_MODEL:
+      CLAIMSCAN_AGGREGATOR_API_KEY_ENV:       # NAME of the env var holding the key, e.g. OPENAI_API_KEY
+      OPENAI_API_KEY:                         # the key itself: from your shell or an untracked .env, never a committed file
+    restart: unless-stopped
+
+  llama:
+    profiles: ["aggregator"]
+    # CPU build. GPU option: image ghcr.io/ggml-org/llama.cpp:server-cuda, add "-ngl", "99" to the
+    # command and uncomment `deploy:` below. Needs the NVIDIA driver on Windows plus the NVIDIA
+    # Container Toolkit (Docker Desktop's WSL2 backend provides GPU support). The 6 GB RTX 2060 is
+    # shared with training, so don't run both at once.
+    # `:server` follows llama.cpp master; pin a build tag (e.g. server-b<NNNN>) for reproducibility.
+    image: ${LLAMA_IMAGE:-ghcr.io/ggml-org/llama.cpp:server}
+    init: true
+    ports:
+      - "${LLAMA_PORT:-8083}:8080"            # host 8083 = aggregator.base_url in configs/default.yaml
+    volumes:
+      - ${LLAMA_MODELS_DIR:-/mnt/e/llm/models}:/models:ro
+    command:
+      - "-m"
+      - "/models/${AGGREGATOR_MODEL:-gemma-3-4b-it-Q4_K_M.gguf}"   # placeholder until the Gemma file is picked
+      - "--host"
+      - "0.0.0.0"
+      - "--port"
+      - "8080"
+      - "--jinja"                             # the model's own chat template (needed for json_schema output)
+      - "-c"
+      - "${LLAMA_CTX:-8192}"
+      - "-np"
+      - "1"                                   # one slot: the api sends one claim at a time
+      - "-t"
+      - "${LLAMA_THREADS:-4}"
+    # the image's own HEALTHCHECK curls /health (OK once the model is loaded)
+    restart: unless-stopped
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: 1
+    #           capabilities: [gpu]
