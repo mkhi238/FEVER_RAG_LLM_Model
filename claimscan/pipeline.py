@@ -66,8 +66,8 @@ def load_retriever(cfg: ClaimScanConfig = config, kind: str | None = None):
 def load_services(cfg: ClaimScanConfig = config) -> Services:
   model = load_verifier(cfg)
   retriever = load_retriever(cfg)
-  corpus_df = pd.read_parquet(cfg.corpus)
-  return Services(model=model, retriever=retriever, corpus_df=corpus_df)
+  from claimscan.evidence.store import SentenceStore
+  return Services(model=model, retriever=retriever, corpus_df=SentenceStore(cfg.sentence_store))
 
 
 def verify(model, claim, evidence):

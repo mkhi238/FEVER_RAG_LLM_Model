@@ -68,7 +68,7 @@ class AggregatedVerdict:
 
 
 def build_llm(cfg):
-  """The structured runnable aggregate() expects: build_chat("aggregator") on cfg.aggregator_base_url, or ChatTogether when a key is set.
+  """The structured runnable aggregate() expects: build_chat("aggregator") (port from llamacpp/roles.yaml unless cfg.aggregator_base_url is set), or ChatTogether when a key is set.
 
   The API key comes from the env var NAMED by cfg.aggregator_api_key_env (empty = local llama-server, no key).
   If that var is unset/empty, returns an UnavailableLLM so every request fails open with that reason.
@@ -85,7 +85,7 @@ def build_llm(cfg):
   # the instruct package's VetoOutput wins; the local class is only a fallback until it defines one
   schema = getattr(rear_aggregator, "VetoOutput", None) or getattr(schemas, "VetoOutput", None) or VetoOutput
   if key_env:
-    # hosted: Together AI (its own endpoint; aggregator.base_url is only for the local llama-server)
+    # hosted: Together AI (its own endpoint; aggregator_base_url is only for the local llama-server)
     from langchain_together import ChatTogether
     chat = ChatTogether(model=cfg.aggregator_model, api_key=api_key,
                         timeout=cfg.aggregator_timeout, max_retries=0, temperature=0)

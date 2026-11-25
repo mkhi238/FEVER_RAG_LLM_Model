@@ -24,11 +24,11 @@ image; `requirements.txt` stays the list of what the code needs; `WITH_BM25=0` d
 2. **Keep Docker off C:** Docker Desktop → Settings → Resources → Advanced → *Disk image location* → a
    folder on D: (e.g. `D:\DockerDesktop`). The default is under `%LOCALAPPDATA%` on C:, and the image plus
    build cache is a few GB. Check with `docker info --format '{{.DockerRootDir}}'` and Docker Desktop's setting.
-3. **Sentence store** (replaces loading the 4 GB corpus into RAM):
+3. **FEVER SQLite** `<artifacts>/data/processed/fever_sentences.sqlite` (sentences, claims, evidence; replaces
+   loading the 4 GB corpus into RAM). How to build it: `claimscan/data/fever_db.py`. Check it:
    ```bash
    source .venv/bin/activate && source scripts/env.sh
-   python -m claimscan.evidence.store build    # ~20-40 min, writes <artifacts>/data/processed/fever_sentences.sqlite
-   python -m claimscan.evidence.store check
+   python -m claimscan.evidence.store
    ```
 
 ## Run with compose (recommended)

@@ -71,7 +71,7 @@ python -m claimscan.eval.fever_eval --max-claims 200       # end-to-end FEVER sc
 python -m pytest -q
 ```
 
-The API uses the same `fact_check_detailed` as the benchmark (k=30, 0.5 confidence floor), so benchmark numbers are what the API does. It reads sentence text from a SQLite store (`python -m claimscan.evidence.store build`) instead of loading the 4 GB corpus.
+The API uses the same `fact_check_detailed` as the benchmark (k=30, 0.5 confidence floor), so benchmark numbers are what the API does. It reads sentence text from the FEVER SQLite file (`claimscan/data/fever_db.py`) instead of loading the 4 GB corpus.
 
 Benchmark and training runs are logged to MLflow. To browse them:
 

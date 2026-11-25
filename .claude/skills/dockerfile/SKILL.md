@@ -33,9 +33,8 @@ ls -d /mnt/d/huggingface_cache/hub/models--BAAI--bge-small-en-v1.5 /mnt/d/huggin
 
 - **Docker disk on C:** stop. The repo's hard rule is nothing on C:. Docker Desktop → Settings → Resources →
   Advanced → *Disk image location* → `E:\DockerDesktop`.
-- **No sentence store:** `source .venv/bin/activate && source scripts/env.sh && nice -n 19 python -m claimscan.evidence.store build`
-  (~20-40 min, on D:), then `python -m claimscan.evidence.store check`. The image can be built without it, but
-  the API can't start.
+- **No sentence store:** build `fever_sentences.sqlite` as described in `claimscan/data/fever_db.py` (on D:),
+  then check it with `python -m claimscan.evidence.store`. The image can be built without it, but the API can't start.
 - **Uncommitted changes under `claimscan/` or `configs/`:** they would be baked into the image. Build from a clean
   ship/main checkout instead.
 

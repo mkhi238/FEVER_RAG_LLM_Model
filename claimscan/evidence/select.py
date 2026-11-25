@@ -10,6 +10,8 @@ from claimscan.neurosymbolic_layer import score_evidence_quality
 
 def _lookup_text(corpus_df, page, line):
   """Sentence text for (page, line), or None. Fast path for a corpus indexed by (id, line)."""
+  if hasattr(corpus_df, "for_hits"):   # SentenceStore (same check as pipeline.fact_check_detailed)
+    return corpus_df.lookup(page, line)
   if isinstance(corpus_df.index, pd.MultiIndex) and corpus_df.index.names == ["id", "line"]:
     try:
       row = corpus_df.loc[(page, line)]

@@ -59,10 +59,7 @@ def evaluate_pipeline(max_claims=200, retriever=None, k=30, conf_threshold=0.5, 
   """Run fact_check_cleaned on a random sample of FEVER claims and score it."""
   from claimscan.config import config
   from claimscan.eval.gold import load_claims, load_gold_sets
-  from claimscan.evidence.select import index_corpus
   from claimscan.pipeline import Services, fact_check_cleaned, load_retriever, load_verifier
-
-  import pandas as pd
 
   claims = load_claims(split)
   if max_claims is not None and max_claims < len(claims):
@@ -72,8 +69,9 @@ def evaluate_pipeline(max_claims=200, retriever=None, k=30, conf_threshold=0.5, 
         f"({claims['label_text'].value_counts().to_dict()})")
 
   if services is None:
-    print("[fever] loading verifier, retriever, corpus (indexed by id, line)...")
-    corpus = index_corpus(pd.read_parquet(config.corpus, columns=["id", "line", "text"]))
+    from claimscan.evidence.store import SentenceStore
+    print("[fever] loading verifier, retriever, sentence store...")
+    corpus = SentenceStore(config.sentence_store)
     services = Services(model=load_verifier(config), retriever=load_retriever(config, retriever),
                         corpus_df=corpus)
 

@@ -27,9 +27,8 @@ import subprocess
 import sys
 from pathlib import Path
 
-import pyarrow.dataset as ds
-
 from claimscan.config import config
+from claimscan.data import fever_db
 
 PART_ROWS = 1_000_000
 
@@ -38,10 +37,9 @@ def doc_for(page: str, line: int, text: str) -> dict:
   return {"id": f"{page}#{line}", "contents": f"{page.replace('_', ' ')} [SEP] {page} [SEP] {text}"}
 
 
-def write_jsonl(corpus=config.corpus, out_dir=config.bm25_jsonl_dir, part_rows=PART_ROWS, limit=None):
+def write_jsonl(db=None, out_dir=config.bm25_jsonl_dir, part_rows=PART_ROWS, limit=None):
   out_dir = Path(out_dir)
   out_dir.mkdir(parents=True, exist_ok=True)
-  scanner = ds.dataset(str(corpus)).scanner(columns=["id", "line", "text"], batch_size=100_000)
 
   part, rows_in_part, total, f = 0, 0, 0, None
   skipping = False
@@ -58,8 +56,8 @@ def write_jsonl(corpus=config.corpus, out_dir=config.bm25_jsonl_dir, part_rows=P
       (out_dir / f"sentences_{n:03d}.jsonl.tmp").rename(out_dir / f"sentences_{n:03d}.jsonl")
 
   f, skipping = open_part(part)
-  for batch in scanner.to_batches():
-    cols = batch.to_pydict()
+  for batch in fever_db.iter_sentences(100_000, db=db):
+    cols = batch.to_dict("list")
     for page, line, text in zip(cols["id"], cols["line"], cols["text"]):
       if page is None or line is None or text is None:
         continue
@@ -76,7 +74,7 @@ def write_jsonl(corpus=config.corpus, out_dir=config.bm25_jsonl_dir, part_rows=P
         break
     if limit is not None and total >= limit:
       break
-    if total % 5_000_000 < batch.num_rows:
+    if total % 5_000_000 < len(batch):
       print(f"[bm25] {total:,} sentences")
   close_part(part, f)
   print(f"[bm25] jsonl done: {total:,} sentences in {part + 1} parts -> {out_dir}")

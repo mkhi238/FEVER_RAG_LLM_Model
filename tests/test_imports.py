@@ -4,11 +4,8 @@ import pytest
 
 MODULES = [
   "claimscan.config",
-  "claimscan.data.common",
-  "claimscan.data.fever_claim",
-  "claimscan.data.fever_evidence",
-  "claimscan.data.fever_wiki_dump",
-  "claimscan.data.unify",
+  "claimscan.data.fever_db",
+  "claimscan.data.posttrain_store",
   "claimscan.neurosymbolic_layer",
   "claimscan.neurosymbolic_layer.score",
   "claimscan.evidence.select",

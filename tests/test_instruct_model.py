@@ -98,6 +98,6 @@ def test_api_key_passed_through(roles_file):
 
 
 def test_real_roles_yaml():
-  """The checked-in llamacpp/roles.yaml: ports must match configs/default.yaml and docker-compose (8083)."""
+  """The checked-in llamacpp/roles.yaml: the aggregator port must match docker-compose's LLAMA_PORT default (8083)."""
   assert model.build_chat("aggregator").openai_api_base == "http://127.0.0.1:8083/v1"
   assert model.build_chat("decomposer").openai_api_base == model.build_chat("front_facer").openai_api_base

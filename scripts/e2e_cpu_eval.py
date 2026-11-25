@@ -64,7 +64,6 @@ def main(argv=None):
   if free < args.min_free_gb:
     sys.exit(f"Only {free:.1f} GB RAM available (< {args.min_free_gb} GB). Not starting; free memory or lower --min-free-gb.")
 
-  import pyarrow.parquet as pq
   import torch
   torch.set_num_threads(args.threads)
   assert not torch.cuda.is_available(), "GPU is visible; refusing to run"
@@ -80,8 +79,8 @@ def main(argv=None):
     print(f"[{time.time() - t0:7.1f}s]", *a, flush=True)
 
   def corpus_rows(pages):
-    t = pq.read_table(str(config.corpus), columns=["id", "line", "text"], filters=[("id", "in", sorted(set(pages)))])
-    return index_corpus(t.to_pandas())
+    from claimscan.data import fever_db
+    return index_corpus(fever_db.sentences(pages))
 
   class Cached:
     """Lets fact_check_cleaned reuse hits already fetched (so retrieval is timed and run once)."""

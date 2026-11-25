@@ -28,7 +28,9 @@ python scripts/verifier_smoke.py
 
 ## Serving + graphs (2026-11-24)
 - API serves `pipeline.fact_check_detailed` (same logic as `fact_check_cleaned`, k=30, 0.5), so benchmark numbers = API behaviour. Keep it that way.
-- API reads sentence text from the SQLite store (`python -m claimscan.evidence.store build`), never the 4 GB corpus. `docker/README.md` for the image (artifacts + HF cache mounted read-only).
+- All FEVER data is in one SQLite file, `<artifacts>/data/processed/fever_sentences.sqlite` (tables sentences, claims, evidence;
+  `claimscan/data/fever_db.py` builds and reads it; moved off parquet 2026-11-25). Pipeline, eval, API and `verifier/prepare.py`
+  look sentences up there, never loading the 4 GB corpus. `docker/README.md` for the image (artifacts + HF cache mounted read-only).
 - `graphs/` is generated: `/graphs` skill or `python -m claimscan.graph.make_graphs`; never hand-edit it. A Stop hook (`.claude/hooks/graphs_if_stale.sh`) rebuilds it in the background when an eval result is newer.
 - Publishing: only working end-to-end parts go to `main` (merged from a separate `ship` branch built in its own worktree,
   never by switching branches in the shared checkout). Shipped 2026-11-25: API + SQLite store + Docker, hybrid retriever,
@@ -56,10 +58,9 @@ python scripts/verifier_smoke.py
      But `faiss_indexer.py` builds `IndexFlatIP`, so a rebuild would flip the score direction.
 2. Learning notes moved out of the code to `notes/ml_notes.txt`; ask before committing `notes/`.
 3. **Per-file check:** make every file run, be efficient for 15 GB RAM / 6 GB VRAM, and be clear. Known issues:
-   - `verifier/prepare.py` scans all 25M corpus rows per claim (75k claims); use `evidence.select.index_corpus`.
-   - Loads the full corpus (~4 GB) and the 17.1M docid list (~1.5 GB) into RAM.
+   - The 17.1M FAISS docid list (~1.5 GB) is loaded into RAM. (The corpus is no longer loaded: SQLite lookups, 2026-11-25.)
 4. **Next (when the user's RL training is off the machine):** `python -m claimscan.eval.eval_retriever --retriever faiss bm25 hybrid`,
-   then `python -m claimscan.eval.fever_eval --max-claims 200`; then fix line-0 in `verifier/prepare.py` and retrain.
+   then `python -m claimscan.eval.fever_eval --max-claims 200`; then rerun `verifier/prepare.py` (line 0 now fixed in the data) and retrain.
    `claimscan/instruct/` (front decomposer / rear aggregator, LangChain) is the user's; help only if asked.
    Front decomposer: keep it to splitting text into claims; query writing is the RL-trained research agent's job.
 
@@ -74,8 +75,8 @@ python scripts/verifier_smoke.py
   claims: ready-made 82%, old 57% (`pytest tests/test_fever_suite.py -k gold_evidence`). Leak check: 88% on FEVER train claims
   it saw vs 82% on our dev claims, so no sign of leakage (FEVER-NLI trains on FEVER train only). Weak spot: NEI recall 39%.
   The user decided not to fine-tune it for now; options if needed: confidence cut-off tuning, or fine-tune on NEI (VitaminC).
-- **FEVER line 0 is stored as -1** (HF loader, falsy 0) in the evidence parquet and fever_gold.json: 46% of gold pairs.
-  `eval/gold.py` fixes it; `verifier/prepare.py` does NOT, so verifier training lost that evidence (retrain candidate).
+- **FEVER line 0 was stored as -1** (HF loader, falsy 0): 46% of gold pairs. The SQLite evidence table stores 0 now, but the
+  old `deberta_v1` verifier was trained on data from before the fix.
 - FAISS indexes cover only shards 0–174 of 253 (17.1M of 25.2M sentences). The corpus is sorted by title
   (bge index ends at `Panel_of_Chairs#1`), and the training shards 0–3 were never added.
 - The old verifier's 94–95% figure came from the old split: its validation set was all 1,500 NEI examples, so TRUE/FALSE was never checked.

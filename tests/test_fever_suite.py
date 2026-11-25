@@ -85,7 +85,7 @@ def suite(request):
   base = json.loads(BASELINE_FILE.read_text())
   if not 1 <= n <= len(base["predictions"]):
     pytest.fail(f"--fever-claims must be 1..{len(base['predictions'])}, got {n}")
-  for p in (cfg.verifier_output_dir, cfg.corpus):
+  for p in (cfg.verifier_output_dir, cfg.sentence_store):
     if not Path(p).exists():
       pytest.skip(f"artifact missing: {p}")
 
@@ -197,7 +197,7 @@ def gold_evidence_run(request):
   from claimscan.evidence.select import _lookup_text, index_corpus
   from claimscan.pipeline import load_verifier, verify
 
-  for p in (cfg.verifier_checkpoint, cfg.corpus):
+  for p in (cfg.verifier_checkpoint, cfg.sentence_store):
     if not Path(p).exists():
       pytest.skip(f"artifact missing: {p}")
   base = json.loads(BASELINE_FILE.read_text())

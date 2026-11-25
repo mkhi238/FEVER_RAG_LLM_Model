@@ -209,20 +209,10 @@ class CachedRetriever:
 
 
 def load_corpus_subset(pages: set, cfg=config) -> pd.DataFrame:
-  """Only the corpus rows of the given pages, indexed by (id, line), streamed from the parquet."""
-  import pyarrow as pa
-  import pyarrow.dataset as ds
+  """Only the sentences of the given pages, indexed by (id, line), from the SQLite store."""
+  from claimscan.data import fever_db
   from claimscan.evidence.select import index_corpus
-
-  # stream record batches and keep only matches; to_table() over 25M rows held ~2 GB in the arrow pool
-  scanner = ds.dataset(str(cfg.corpus), format="parquet").scanner(
-    columns=["id", "line", "text"], filter=ds.field("id").isin(pa.array(sorted(pages), type=pa.string())),
-    batch_size=65_536, use_threads=False)
-  parts = [b.to_pandas() for b in scanner.to_batches() if b.num_rows]
-  del scanner
-  pa.default_memory_pool().release_unused()
-  df = pd.concat(parts, ignore_index=True) if parts else pd.DataFrame(columns=["id", "line", "text"])
-  return index_corpus(df)
+  return index_corpus(fever_db.sentences(pages, db=cfg.sentence_store))
 
 
 def load_decider(spec: str | None):

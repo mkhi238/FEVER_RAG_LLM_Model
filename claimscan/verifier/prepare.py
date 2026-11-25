@@ -6,8 +6,8 @@ claim's top FAISS hits that are not gold evidence. Up to ``--per-class`` of each
 Fixes over the first version (whose output trained the current checkpoint):
   * line 0: gold line 0 is stored as -1 (eval/gold.py); it was never matched, so ~46% of
     gold sentences were lost and gold line-0 sentences could be used as NEI negatives.
-  * speed: sentences are looked up in an (id, line)-indexed corpus and evidence is grouped
-    by claim once, instead of scanning 25M corpus rows / 367k evidence rows per claim.
+  * speed + RAM: sentences are looked up in the SQLite store (claimscan/data/fever_db.py) and evidence
+    is grouped by claim once, instead of scanning 25M corpus rows / 367k evidence rows per claim.
   * repeated gold sentences (same sentence in several annotation sets) are kept once.
   * ``--split validation`` builds a held-out set from FEVER's dev claims.
 
@@ -19,26 +19,16 @@ import argparse
 import json
 from pathlib import Path
 
-import pandas as pd
 from tqdm import tqdm
 
 from claimscan.config import config
-from claimscan.eval.gold import fix_line, load_claims, norm_title
-from claimscan.evidence.select import _lookup_text, index_corpus
+from claimscan.eval.gold import load_claims, load_gold_pairs, norm_title
+from claimscan.evidence.select import _lookup_text
+from claimscan.evidence.store import SentenceStore
 
 LABELS = ("TRUE", "FALSE", "NOT ENOUGH INFO")
 
 
-def group_gold_pairs(evidence_df):
-  """{claim id: [(page, line), ...]} in file order, line-0 fixed, no duplicates. NEI rows (no page) are skipped."""
-  ev = evidence_df[evidence_df["evidence_wiki_url"].notna() & (evidence_df["evidence_wiki_url"] != "")]
-  out = {}
-  for cid, page, line in zip(ev["id"], ev["evidence_wiki_url"], ev["evidence_sentence_id"]):
-    pairs = out.setdefault(int(cid), [])
-    pair = (norm_title(page), fix_line(line))
-    if pair not in pairs:
-      pairs.append(pair)
-  return out
 
 
 def get_evidence_text(gold_pairs, corpus):
@@ -112,9 +102,8 @@ def main():
   from claimscan.retrieval.faiss_retriever import FAISSRetriever
 
   claims_df = load_claims(args.split)
-  gold_by_claim = group_gold_pairs(pd.read_parquet(config.evidence))
-  print("Loading and indexing the corpus (a few minutes, ~several GB RAM)...")
-  corpus = index_corpus(pd.read_parquet(config.corpus, columns=["id", "line", "text"]))
+  gold_by_claim = load_gold_pairs()
+  corpus = SentenceStore(config.sentence_store)   # per-sentence SQLite lookups, no corpus in RAM
   retriever = FAISSRetriever(config.retriever_index_dir, config.retriever_model)
 
   examples = create_training_data(claims_df, gold_by_claim, corpus, retriever, args.per_class, args.n_claims)

@@ -36,8 +36,8 @@ Read `CLAUDE.md` in the repo root first: it has the project's rules and known is
 
 ## Known gotchas (not bugs)
 - The stored FAISS index is L2: lower = better (the hybrid retriever returns `score = 1/rrf_score` to match). Evidence scoring (`claimscan/neurosymbolic_layer/score.py`) uses each hit's rank, not its score.
-- In the FEVER evidence parquet and `fever_gold.json`, line `-1` means line 0 (an HF loader quirk). `claimscan/eval/gold.py` fixes this;
-  `claimscan/verifier/prepare.py` still has the issue, which is known and left as is.
+- All FEVER data (sentences, claims, gold evidence) is in one SQLite file, `fever_sentences.sqlite` (`claimscan/data/fever_db.py`).
+  The HF loader wrote evidence line 0 as -1; the evidence table stores it as 0 already.
 - Writes to D: sometimes return ENOENT but succeed anyway. Check the file before retrying.
 - BM25 (pyserini) needs Java 21, and cold queries take 6–11 s. FAISS cold queries can take minutes.
 
