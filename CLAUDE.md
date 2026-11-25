@@ -35,7 +35,7 @@ python scripts/verifier_smoke.py
   rear aggregator (`aggregation.py`, `instruct/{schemas,chat_clients,rear_aggregator}.py`, off by default, fails open), graph, `.claude/`.
   Still `refactor`-only: agents, rerank, llm, serve, `instruct/{front_decomposer,prompts}.py`, most of `llamacpp/`, `scripts/e2e_cpu_eval.py`.
 - Shipped retriever default: `retriever.kind: hybrid` with `bm25.rm3: false` (benchmark name `hybrid_norm3`). 300 claims, k=30:
-  label acc 0.51, FEVER 0.38. The FEVER claim suite (`/fever-300`, `/fever-10`) checks it per claim. The user's reference number is
+  label acc 0.51, FEVER 0.38. The FEVER claim suite (`/fever` for 10 claims, `/fever 300` for the full numbers) checks it per claim. The user's reference number is
   64.5% (an N=30 trial, not saved); the recall/testing method is being redone.
 - Rear aggregator veto: fixed in `rear_aggregator.final_label` (verifier conf < 0.6 or LLM conf >= 0.9), not configurable.
   Hosted LLM = Together AI (`ChatTogether` in `aggregation.build_llm`): setting `aggregator.api_key_env` (the env var NAME, never the key) switches to it; local llama-server goes through `instruct/chat_clients.build_chat`.

@@ -16,7 +16,7 @@ def _deselect(config, items, marker):
 
 def pytest_collection_modifyitems(config, items):
   """The slow FEVER suite runs only when tests/test_fever_suite.py is named (or with -m fever_suite).
-  Its gold-evidence measurement (~200 claims) is not part of /fever-10 or /fever-300: it runs only when
+  Its gold-evidence measurement (~200 claims) is not part of /fever: it runs only when
   asked for with -k gold_evidence or -m gold_evidence."""
   asked = (config.getoption("-k") or "") + " " + (config.getoption("-m") or "")
   if "gold_evidence" not in asked:

@@ -62,7 +62,7 @@ docker compose down
 `docker-health.sh` waits on the container's HEALTHCHECK (`/health` → `models_loaded`, start period 300 s). It
 falls back to probing `/health` directly, then POSTs a likely-TRUE, a likely-FALSE and a likely-NEI claim. It
 checks the HTTP status and response shape, not the verdict: the verifier is imperfect, and the benchmark covers
-accuracy (`/fever-300`).
+accuracy (`/fever 300`).
 
 ## Quick reference
 

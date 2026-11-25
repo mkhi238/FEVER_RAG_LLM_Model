@@ -42,5 +42,5 @@ Run with `nice -n 19` if the user's RL training may be on the machine. Don't add
   rerank, scoring, store, verifier_data (plus the deselected fever_suite).
 - `claimscan/llm/` has no tests yet. `test_rear_aggregator.py` skips until `claimscan/instruct/rear_aggregator.py` exists.
 - Tests must not need the GPU or the 4 GB corpus. If one tries to load them, say so in the report.
-- `tests/test_fever_suite.py` (the FEVER claim suite) is deselected here by `-m "not fever_suite"` in pyproject.
-  Run it with `/fever-300` or `/fever-10`, not this skill.
+- `tests/test_fever_suite.py` (the FEVER claim suite) is deselected from a plain `pytest` by tests/conftest.py.
+  Run it with `/fever [N]`, not this skill.

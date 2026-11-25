@@ -4,8 +4,8 @@
 Not part of the unit tests: it needs the artifacts (cached hits, gold, corpus, verifier checkpoint), so it is
 skipped by a plain `pytest` (tests/conftest.py) and run by naming the file:
 
-    pytest tests/test_fever_suite.py                     # 300 claims (/fever-300)
-    pytest tests/test_fever_suite.py --fever-claims 10   # fast (/fever-10)
+    pytest tests/test_fever_suite.py --fever-claims 10   # quick (/fever, the default)
+    pytest tests/test_fever_suite.py                     # 300 claims (/fever 300)
 
 Compute: retrieval is NOT rerun. Both sizes read the FAISS and BM25 (no RM3) hits that the benchmark cached for the
 300-claim sample (<eval_dir>/cache/hits), fuse them exactly as the benchmark does, and rerun only the
@@ -14,10 +14,11 @@ same sample, so it reuses those hits too (a fresh 10-claim sample would need a f
 The corpus sentences those hits point at are cut from the 4 GB corpus once and cached in <eval_dir>/fever_suite.
 If the cached hits are missing, they are rebuilt once with the benchmark's own _retrieve stage (~15 min).
 
-Checked against tests/data/fever_suite_hybrid_norm3_baseline.json (benchmark run 20261124-220309, hybrid_norm3):
-  - per-claim predicted labels: at most MAX_FLIPS differ
-  - 300 claims: retrieval metrics exactly, and the FEVER metric within MAX_FLIPS claims
-Results are written to <eval_dir>/fever_suite/latest_n<N>.json (read by the /fever-300 and /fever-10 skills).
+One test, test_suite_matches_baseline, checks against tests/data/fever_suite_hybrid_norm3_baseline.json
+(benchmark run 20261124-220309, hybrid_norm3):
+  - any N: per-claim predicted labels, at most MAX_FLIPS differ
+  - 300 claims: also label accuracy / FEVER score within MAX_FLIPS claims, and retrieval metrics exactly
+Results are written to <eval_dir>/fever_suite/latest_n<N>.json (read by the /fever skill).
 """
 from __future__ import annotations
 
@@ -134,33 +135,29 @@ def suite(request):
   return result, base
 
 
-def test_predictions_match_baseline(suite):
-  result, _ = suite
-  assert len(result["flips_vs_baseline"]) <= MAX_FLIPS, result["flips_vs_baseline"]
-
-
-def test_fever_metric_matches_baseline(suite):
+def test_suite_matches_baseline(suite):
+  """Per-claim predictions (any N), and at the full 300 claims also the numbers: label accuracy and FEVER score
+  (within MAX_FLIPS claims) and retrieval metrics (exactly). The numbers are in latest_n<N>.json either way."""
   result, base = suite
-  if result["n_claims"] != len(base["predictions"]):
-    pytest.skip("baseline FEVER metric is for the full 300-claim sample")
-  tol = MAX_FLIPS / result["n_claims"] + 1e-9
-  for m in ("label_accuracy", "fever_score"):
-    assert result["e2e"][m] == pytest.approx(base["e2e"][m], abs=tol), m
-
-
-def test_retrieval_matches_baseline(suite):
-  result, base = suite
-  if result["n_claims"] != len(base["predictions"]):
-    pytest.skip("baseline retrieval metrics are for the full 300-claim sample")
-  for m, v in base["retrieval"].items():
-    assert result["retrieval"][m] == pytest.approx(v, abs=1e-9), m
+  problems = []
+  if len(result["flips_vs_baseline"]) > MAX_FLIPS:
+    problems.append(f"{len(result['flips_vs_baseline'])} claims changed prediction: {result['flips_vs_baseline']}")
+  if result["n_claims"] == len(base["predictions"]):
+    tol = MAX_FLIPS / result["n_claims"] + 1e-9
+    for m in ("label_accuracy", "fever_score"):
+      if abs(result["e2e"][m] - base["e2e"][m]) > tol:
+        problems.append(f"{m} {result['e2e'][m]:.3f} vs baseline {base['e2e'][m]:.3f}")
+    for m, v in base["retrieval"].items():
+      if abs(result["retrieval"][m] - v) > 1e-9:
+        problems.append(f"retrieval {m} {result['retrieval'][m]:.4f} vs baseline {v:.4f}")
+  assert not problems, "\n".join(problems)
 
 
 # --- Verifier with gold evidence --------------------------------------------------------------------------------
 # Measures the DeBERTa verifier on its own: the suite's TRUE/FALSE claims (NEI claims have no gold evidence) get the
 # gold sentences (first FEVER evidence set, at most 3) instead of retrieved ones. Compared with the suite's own
 # accuracy on the same claims, read from the baseline file. A measurement, not an accuracy check. It is NOT part of
-# /fever-10 or /fever-300 (tests/conftest.py deselects it): run it by naming it with -k or -m gold_evidence:
+# /fever (tests/conftest.py deselects it): run it by naming it with -k or -m gold_evidence:
 #
 #     pytest tests/test_fever_suite.py -k gold_evidence -s
 #
