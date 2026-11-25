@@ -101,6 +101,9 @@ class ClaimScanConfig:
   aggregator_timeout: float = 30.0
   aggregator_api_key_env: str = ""   # NAME of the env var holding the key; "" = local llama-server
 
+  # verifier used at inference: "ours" (verifier_checkpoint) or a HuggingFace NLI model name
+  verifier_inference_model: str = "ours"
+
   @property
   def bm25_index_dir(self) -> Path:
     return self.bm25_dir / "index"
@@ -203,6 +206,7 @@ def load_config(path: str | os.PathLike | None = None) -> ClaimScanConfig:
     aggregator_model=str(os.environ.get("CLAIMSCAN_AGGREGATOR_MODEL", ag.get("model", "gemma"))),
     aggregator_timeout=float(os.environ.get("CLAIMSCAN_AGGREGATOR_TIMEOUT", ag.get("timeout", 30.0))),
     aggregator_api_key_env=str(os.environ.get("CLAIMSCAN_AGGREGATOR_API_KEY_ENV", ag.get("api_key_env") or "")),
+    verifier_inference_model=str(v.get("inference_model", "ours")),
   )
 
   # Must happen before transformers / sentence_transformers are imported.

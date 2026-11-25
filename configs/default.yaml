@@ -107,6 +107,9 @@ default_dense_index: bge_small
 
 verifier:
   model: microsoft/deberta-v3-base
+  # Verifier the pipeline / API / benchmark use: "ours" (verifier_output_dir/trained_model/model.pt)
+  # or a HuggingFace NLI model, e.g. MoritzLaurer/DeBERTa-v3-base-mnli-fever-anli (claimscan/verifier/hf_nli.py)
+  inference_model: MoritzLaurer/DeBERTa-v3-base-mnli-fever-anli
   batch_size: 8
   learning_rate: 2.0e-5
   num_epochs: 3

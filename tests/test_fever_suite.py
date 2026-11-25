@@ -49,7 +49,7 @@ def balanced_slice(claims, n: int):
   return claims.iloc[keep].reset_index(drop=True)
 
 
-def _services_factory(cfg, B, all_fused: dict, base: dict, out_dir: Path):
+def _services_factory(cfg, B, all_fused: dict, base: dict, out_dir: Path, verifier: str):
   """Verifier on 2 CPU threads + the corpus rows of every page in the 300 claims' top-k hybrid hits.
 
   The subset is cut from the 4 GB corpus once (the slow part, minutes on D:) and cached as a small parquet,
@@ -70,7 +70,7 @@ def _services_factory(cfg, B, all_fused: dict, base: dict, out_dir: Path):
     corpus = B.load_corpus_subset(pages, cfg)
     out_dir.mkdir(parents=True, exist_ok=True)
     corpus.reset_index().to_parquet(path)
-  model = load_verifier(cfg)
+  model = load_verifier(cfg, verifier)
   return lambda retr: Services(model=model, retriever=retr, corpus_df=corpus)
 
 
@@ -117,28 +117,38 @@ def suite(request):
   t = time.perf_counter()
   retrieval = B.retrieval_metrics(fused, gold)
   out_dir = Path(cfg.eval_dir) / "fever_suite"
-  services_factory = _services_factory(cfg, B, all_fused, base, out_dir)
-  e2e = B.e2e_stage(claims, {RETRIEVER: fused}, out_dir / f"e2e_n{n}.json", k=base["k"],
+  verifier = request.config.getoption("--verifier") or cfg.verifier_inference_model
+  tag = "" if verifier == base["verifier"] else "_" + verifier.replace("/", "__")   # other verifiers: own files
+  services_factory = _services_factory(cfg, B, all_fused, base, out_dir, verifier)
+  e2e = B.e2e_stage(claims, {RETRIEVER: fused}, out_dir / f"e2e_n{n}{tag}.json", k=base["k"],
                     conf_threshold=base["conf_threshold"], threads=2, services_factory=services_factory,
                     gold=gold, cfg=cfg)[RETRIEVER]
-  preds = pd.read_parquet(out_dir / f"e2e_n{n}.predictions.parquet")
+  preds = pd.read_parquet(out_dir / f"e2e_n{n}{tag}.predictions.parquet")
   pred = {int(r.id): r.pred for r in preds.itertuples()}
   flips = [{"id": i, "gold": base["predictions"][str(i)]["gold"], "baseline": base["predictions"][str(i)]["pred"],
             "now": pred[i]} for i in ids if pred[i] != base["predictions"][str(i)]["pred"]]
 
   result = {"timestamp": datetime.now().isoformat(timespec="seconds"), "n_claims": n, "retriever": RETRIEVER,
+            "verifier": verifier, "baseline_verifier": base["verifier"],
             "labels": claims["label_text"].value_counts().to_dict(), "retrieval": retrieval, "e2e": e2e,
             "flips_vs_baseline": flips, "baseline": {"retrieval": base["retrieval"], "e2e": base["e2e"]},
             "wall_clock_s": round(time.perf_counter() - t, 1)}
   out_dir.mkdir(parents=True, exist_ok=True)
-  (out_dir / f"latest_n{n}.json").write_text(json.dumps(result, indent=2))
+  (out_dir / f"latest_n{n}{tag}.json").write_text(json.dumps(result, indent=2))
   return result, base
+
+
+def _skip_if_other_verifier(result):
+  if result["verifier"] != result["baseline_verifier"]:
+    pytest.skip(f"--verifier {result['verifier']}: the baseline is for {result['baseline_verifier']}; "
+                "see latest_n<N>_<model>.json")
 
 
 def test_suite_matches_baseline(suite):
   """Per-claim predictions (any N), and at the full 300 claims also the numbers: label accuracy and FEVER score
   (within MAX_FLIPS claims) and retrieval metrics (exactly). The numbers are in latest_n<N>.json either way."""
   result, base = suite
+  _skip_if_other_verifier(result)
   problems = []
   if len(result["flips_vs_baseline"]) > MAX_FLIPS:
     problems.append(f"{len(result['flips_vs_baseline'])} claims changed prediction: {result['flips_vs_baseline']}")
@@ -165,25 +175,8 @@ def test_suite_matches_baseline(suite):
 #     pytest tests/test_fever_suite.py -k gold_evidence --verifier <dir>/trained_model/model.pt   # another checkpoint
 #     add --gold-split train for 200 TRUE/FALSE train claims instead of the suite's (a leakage check)
 #
-# Writes <eval_dir>/fever_suite/latest_oracle.json (ours) or latest_oracle_<model>.json (a HuggingFace NLI model).
-
-NLI_TO_FEVER = {"entailment": "TRUE", "contradiction": "FALSE", "neutral": "NOT ENOUGH INFO"}
-
-
-def _hf_nli_verifier(name: str):
-  """(claim, evidence) -> label with an off-the-shelf NLI model: premise = evidence, hypothesis = claim."""
-  import torch
-  from transformers import AutoModelForSequenceClassification, AutoTokenizer
-  tok = AutoTokenizer.from_pretrained(name)
-  model = AutoModelForSequenceClassification.from_pretrained(name).eval()
-  labels = {i: NLI_TO_FEVER[l.lower()] for i, l in model.config.id2label.items()}
-
-  def predict(claim, evidence):
-    enc = tok(" ".join(evidence), claim, truncation=True, max_length=512, return_tensors="pt")
-    with torch.no_grad():
-      return labels[int(model(**enc).logits.argmax(-1))]
-  return predict
-
+# Writes <eval_dir>/fever_suite/latest_oracle.json (the config's verifier) or latest_oracle_<model>.json (another one).
+#     --verifier ours = the old trained checkpoint (57% with gold evidence).
 
 def _load_checkpoint(path: str):
   """Our FEVERVerifier from another checkpoint (e.g. a retrained verifier/deberta_v2/trained_model/model.pt)."""
@@ -235,12 +228,9 @@ def gold_evidence_run(request):
     out_dir.mkdir(parents=True, exist_ok=True)
     corpus.reset_index().to_parquet(path)
   torch.set_num_threads(2)
-  name = request.config.getoption("--verifier")
-  if name == "ours" or name.endswith(".pt"):
-    model = load_verifier(cfg) if name == "ours" else _load_checkpoint(name)
-    predict = lambda claim, evidence: verify(model, claim, evidence)[0]
-  else:
-    predict = _hf_nli_verifier(name)
+  name = request.config.getoption("--verifier") or cfg.verifier_inference_model
+  model = _load_checkpoint(name) if name.endswith(".pt") else load_verifier(cfg, name)
+  predict = lambda claim, evidence: verify(model, claim, evidence)[0]
 
   t = time.perf_counter()
   rows = []
@@ -262,7 +252,7 @@ def gold_evidence_run(request):
             "accuracy_suite_retrieved_evidence": acc("pred_suite") if split == "validation" else None,
             "wall_clock_s": round(time.perf_counter() - t, 1), "per_claim": rows}
   tag = Path(name).parent.parent.name if name.endswith(".pt") else name.replace("/", "__")
-  out_name = "latest_oracle.json" if name == "ours" else f"latest_oracle_{tag}.json"
+  out_name = "latest_oracle.json" if name == cfg.verifier_inference_model else f"latest_oracle_{tag}.json"
   if split != "validation":
     out_name = out_name.replace(".json", f"_{split}.json")
   (out_dir / out_name).write_text(json.dumps(result, indent=2))

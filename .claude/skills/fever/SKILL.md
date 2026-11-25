@@ -31,7 +31,7 @@ Compute, kept low on purpose:
 - **No retrieval:** it reads the `faiss` and `bm25_norm3` hits cached by the benchmark (`<artifacts>/eval/cache/hits/*_367fb1deca_c100.jsonl`).
   Only if they're missing does it rebuild them (~15 min, FAISS reads the whole 26 GB index once).
 - **Corpus:** the hits' sentences come from a small cached subset in `<artifacts>/eval/fever_suite/`.
-- **The real work** is the verifier on CPU: ~1.3 s/claim. No GPU.
+- **The real work** is the verifier on CPU (`verifier.inference_model`, default the ready-made NLI model): ~0.5 s/claim. No GPU.
 - Don't run it alongside other benchmark or verifier jobs (`ps aux | grep claimscan`). If one is running, ask first.
 
 ## Report: the numbers
@@ -46,8 +46,9 @@ Read `<artifacts>/eval/fever_suite/latest_n<N>.json` (artifacts = `/mnt/d/crisis
 - `flips_vs_baseline`: count, and each claim id with gold / baseline / current prediction (more than 1 fails)
 - `wall_clock_s`
 
-Baseline: `tests/data/fever_suite_hybrid_norm3_baseline.json` (benchmark run 20261124-220309): label accuracy 0.510,
-FEVER score 0.380, recall_set@10 0.660. The test also requires `bm25.rm3: false`. A failure means the pipeline's
+Baseline: `tests/data/fever_suite_hybrid_norm3_baseline.json` (re-baselined 2026-11-25 for the ready-made verifier
+`MoritzLaurer/DeBERTa-v3-base-mnli-fever-anli`): label accuracy 0.640, FEVER score 0.483, recall_set@10 0.660.
+`--verifier ours` runs the old checkpoint (0.51 / 0.38) into its own latest_n<N>_ours.json, without the baseline check. The test also requires `bm25.rm3: false`. A failure means the pipeline's
 behaviour changed (retrieval, evidence scoring or the verifier): say which number moved. Don't fix anything inside
 this skill. If `/fever` fails, offer `/fever 300` to see how big the change is.
 

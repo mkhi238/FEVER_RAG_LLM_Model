@@ -35,7 +35,7 @@ python scripts/verifier_smoke.py
   rear aggregator (`aggregation.py`, `instruct/{schemas,chat_clients,rear_aggregator}.py`, off by default, fails open), graph, `.claude/`.
   Still `refactor`-only: agents, rerank, llm, serve, `instruct/{front_decomposer,prompts}.py`, most of `llamacpp/`, `scripts/e2e_cpu_eval.py`.
 - Shipped retriever default: `retriever.kind: hybrid` with `bm25.rm3: false` (benchmark name `hybrid_norm3`). 300 claims, k=30:
-  label acc 0.51, FEVER 0.38. The FEVER claim suite (`/fever` for 10 claims, `/fever 300` for the full numbers) checks it per claim. The user's reference number is
+  label acc 0.64, FEVER 0.48 (with the ready-made verifier, 2026-11-25; 0.51 / 0.38 with the old deberta_v1). The FEVER claim suite (`/fever` for 10 claims, `/fever 300` for the full numbers) checks it per claim. The user's reference number is
   64.5% (an N=30 trial, not saved); the recall/testing method is being redone.
 - Rear aggregator veto: fixed in `rear_aggregator.final_label` (verifier conf < 0.6 or LLM conf >= 0.9), not configurable.
   Hosted LLM = Together AI (`ChatTogether` in `aggregation.build_llm`): setting `aggregator.api_key_env` (the env var NAME, never the key) switches to it; local llama-server goes through `instruct/chat_clients.build_chat`.
@@ -69,11 +69,16 @@ python scripts/verifier_smoke.py
   The later RLVR reward for the agent should import from here (per-claim compute() gives a 0/1 FEVER score).
 
 ## Known data/model issues (for the plan)
+- **Default verifier (2026-11-25): `MoritzLaurer/DeBERTa-v3-base-mnli-fever-anli`** (`verifier.inference_model`,
+  `claimscan/verifier/hf_nli.py`; `ours` = the old `deberta_v1` checkpoint). With gold evidence on the suite's 200 TRUE/FALSE
+  claims: ready-made 82%, old 57% (`pytest tests/test_fever_suite.py -k gold_evidence`). Leak check: 88% on FEVER train claims
+  it saw vs 82% on our dev claims, so no sign of leakage (FEVER-NLI trains on FEVER train only). Weak spot: NEI recall 39%.
+  The user decided not to fine-tune it for now; options if needed: confidence cut-off tuning, or fine-tune on NEI (VitaminC).
 - **FEVER line 0 is stored as -1** (HF loader, falsy 0) in the evidence parquet and fever_gold.json: 46% of gold pairs.
   `eval/gold.py` fixes it; `verifier/prepare.py` does NOT, so verifier training lost that evidence (retrain candidate).
 - FAISS indexes cover only shards 0–174 of 253 (17.1M of 25.2M sentences). The corpus is sorted by title
   (bge index ends at `Panel_of_Chairs#1`), and the training shards 0–3 were never added.
-- The verifier's 94–95% figure came from an unshuffled split. It says NEI 0.995 on "Obama was born in Hawaii".
+- The old verifier's 94–95% figure came from the old split: its validation set was all 1,500 NEI examples, so TRUE/FALSE was never checked.
 - The llama.cpp CUDA build is blocked: CUDA 12.4 nvcc needs gcc ≤ 13, and WSL has gcc 15 (options in `llamacpp/README.md`).
 - The big front-facer MoE won't fit in 15 GB RAM, so route front_facer/decomposer to a hosted API (`llamacpp/roles.yaml`).
 

@@ -12,7 +12,7 @@ only for faiss-only images (they must run with `CLAIMSCAN_RETRIEVER=faiss`).
 | mount | host path (default) | what's used |
 |---|---|---|
 | `/artifacts` (ro) | `/mnt/d/crisis-claim-analysis/artifacts` | FAISS index `dense/faiss_bge_small_en_v1_5/` (26 GB, memory-mapped), BM25 Lucene index `sparse/bm25_sentences/index/` (4.3 GB), `data/processed/fever_sentences.sqlite`, verifier `model.pt` |
-| `/hf` (ro) | `/mnt/d/huggingface_cache` | `BAAI/bge-small-en-v1.5`, `microsoft/deberta-v3-base` (offline; nothing is downloaded) |
+| `/hf` (ro) | `/mnt/d/huggingface_cache` | `BAAI/bge-small-en-v1.5`, `microsoft/deberta-v3-base`, `MoritzLaurer/DeBERTa-v3-base-mnli-fever-anli` (the default verifier; offline, nothing is downloaded) |
 | `/models` (ro, `llama` only) | `/mnt/e/llm/models` | the Gemma GGUF for the rear aggregator |
 
 Files: `Dockerfile` and `docker-compose.yml` (repo root), `docker/constraints.txt` (exact versions for the

@@ -26,7 +26,12 @@ class Services:
   corpus_df: "pd.DataFrame | SentenceStore"   # SentenceStore: per-request lookup, used by the API
 
 
-def load_verifier(cfg: ClaimScanConfig = config) -> FEVERVerifier:
+def load_verifier(cfg: ClaimScanConfig = config, name: str | None = None) -> FEVERVerifier:
+  """``name`` (default cfg.verifier_inference_model): "ours" = the trained checkpoint, else a HuggingFace NLI model."""
+  name = name or cfg.verifier_inference_model
+  if name != "ours":
+    from claimscan.verifier.hf_nli import HFNLIVerifier
+    return HFNLIVerifier(name, cfg.max_length).eval()
   model = FEVERVerifier()
   # map_location: checkpoint was saved on GPU; inference here runs on CPU as before
   model.load_state_dict(torch.load(cfg.verifier_checkpoint, map_location="cpu"))

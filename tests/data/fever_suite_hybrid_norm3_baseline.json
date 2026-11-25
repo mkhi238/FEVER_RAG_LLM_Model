@@ -1,1248 +1,1254 @@
 {
- "source": "benchmark run 20261124-220309 (python -m claimscan.eval.benchmark --n 300), retriever 'hybrid_norm3' (FAISS + BM25 without RM3, RRF)",
- "retriever": "hybrid_norm3",
- "bases": [
-  "faiss",
-  "bm25_norm3"
- ],
- "bm25_rm3": false,
- "claims_file": "claims_validation_n300_seed0_cov.parquet",
- "claims_key": "367fb1deca",
- "candidates": 100,
- "rrf_k": 60,
- "k": 30,
- "conf_threshold": 0.5,
- "retrieval": {
-  "n": 200,
-  "mrr": 0.4721444824596789,
-  "hit@1": 0.335,
-  "recall_set@1": 0.3,
-  "recall@1": 0.3116666666666667,
-  "precision@1": 0.335,
-  "hit@5": 0.645,
-  "recall_set@5": 0.575,
-  "recall@5": 0.6029166666666667,
-  "precision@5": 0.135,
-  "hit@10": 0.745,
-  "recall_set@10": 0.66,
-  "recall@10": 0.69375,
-  "precision@10": 0.0785,
-  "hit@20": 0.805,
-  "recall_set@20": 0.7,
-  "recall@20": 0.7412878787878787,
-  "precision@20": 0.0425,
-  "hit@50": 0.89,
-  "recall_set@50": 0.78,
-  "recall@50": 0.8243712121212121,
-  "precision@50": 0.0194
- },
- "e2e": {
-  "label_accuracy": 0.51,
-  "fever_score": 0.38,
-  "evidence_precision": 0.16666666666666666,
-  "evidence_recall": 0.49504950495049505,
-  "evidence_f1": 0.24937655860349128
- },
- "predictions": {
-  "193899": {
-   "gold": "NOT ENOUGH INFO",
-   "pred": "NOT ENOUGH INFO"
-  },
-  "127225": {
-   "gold": "FALSE",
-   "pred": "FALSE"
-  },
-  "204361": {
-   "gold": "TRUE",
-   "pred": "TRUE"
-  },
-  "225729": {
-   "gold": "NOT ENOUGH INFO",
-   "pred": "FALSE"
-  },
-  "179822": {
-   "gold": "NOT ENOUGH INFO",
-   "pred": "TRUE"
-  },
-  "153361": {
-   "gold": "FALSE",
-   "pred": "FALSE"
-  },
-  "42319": {
-   "gold": "NOT ENOUGH INFO",
-   "pred": "NOT ENOUGH INFO"
-  },
-  "19764": {
-   "gold": "NOT ENOUGH INFO",
-   "pred": "NOT ENOUGH INFO"
-  },
-  "209355": {
-   "gold": "TRUE",
-   "pred": "TRUE"
-  },
-  "120846": {
-   "gold": "FALSE",
-   "pred": "NOT ENOUGH INFO"
-  },
-  "185778": {
-   "gold": "NOT ENOUGH INFO",
-   "pred": "TRUE"
-  },
-  "33171": {
-   "gold": "TRUE",
-   "pred": "NOT ENOUGH INFO"
-  },
-  "10205": {
-   "gold": "FALSE",
-   "pred": "TRUE"
-  },
-  "84194": {
-   "gold": "NOT ENOUGH INFO",
-   "pred": "NOT ENOUGH INFO"
-  },
-  "162895": {
-   "gold": "TRUE",
-   "pred": "TRUE"
-  },
-  "105702": {
-   "gold": "TRUE",
-   "pred": "TRUE"
-  },
-  "160366": {
-   "gold": "NOT ENOUGH INFO",
-   "pred": "FALSE"
-  },
-  "2295": {
-   "gold": "TRUE",
-   "pred": "NOT ENOUGH INFO"
-  },
-  "132089": {
-   "gold": "NOT ENOUGH INFO",
-   "pred": "NOT ENOUGH INFO"
-  },
-  "143803": {
-   "gold": "FALSE",
-   "pred": "NOT ENOUGH INFO"
-  },
-  "212768": {
-   "gold": "FALSE",
-   "pred": "TRUE"
-  },
-  "131513": {
-   "gold": "FALSE",
-   "pred": "NOT ENOUGH INFO"
-  },
-  "135968": {
-   "gold": "FALSE",
-   "pred": "FALSE"
-  },
-  "172487": {
-   "gold": "FALSE",
-   "pred": "FALSE"
-  },
-  "143420": {
-   "gold": "NOT ENOUGH INFO",
-   "pred": "TRUE"
-  },
-  "145424": {
-   "gold": "FALSE",
-   "pred": "FALSE"
-  },
-  "162200": {
-   "gold": "FALSE",
-   "pred": "NOT ENOUGH INFO"
-  },
-  "95070": {
-   "gold": "NOT ENOUGH INFO",
-   "pred": "FALSE"
-  },
-  "195384": {
-   "gold": "NOT ENOUGH INFO",
-   "pred": "TRUE"
-  },
-  "119942": {
-   "gold": "NOT ENOUGH INFO",
-   "pred": "TRUE"
-  },
-  "177867": {
-   "gold": "TRUE",
-   "pred": "TRUE"
-  },
-  "13085": {
-   "gold": "TRUE",
-   "pred": "TRUE"
-  },
-  "223670": {
-   "gold": "TRUE",
-   "pred": "TRUE"
-  },
-  "84516": {
-   "gold": "FALSE",
-   "pred": "FALSE"
-  },
-  "111816": {
-   "gold": "NOT ENOUGH INFO",
-   "pred": "NOT ENOUGH INFO"
-  },
-  "157977": {
-   "gold": "FALSE",
-   "pred": "FALSE"
-  },
-  "51526": {
-   "gold": "FALSE",
-   "pred": "TRUE"
-  },
-  "76433": {
-   "gold": "FALSE",
-   "pred": "FALSE"
-  },
-  "83010": {
-   "gold": "NOT ENOUGH INFO",
-   "pred": "NOT ENOUGH INFO"
-  },
-  "41780": {
-   "gold": "TRUE",
-   "pred": "FALSE"
-  },
-  "129541": {
-   "gold": "NOT ENOUGH INFO",
-   "pred": "FALSE"
-  },
-  "34162": {
-   "gold": "TRUE",
-   "pred": "TRUE"
-  },
-  "84420": {
-   "gold": "TRUE",
-   "pred": "TRUE"
-  },
-  "103840": {
-   "gold": "TRUE",
-   "pred": "TRUE"
-  },
-  "182701": {
-   "gold": "TRUE",
-   "pred": "NOT ENOUGH INFO"
-  },
-  "90230": {
-   "gold": "FALSE",
-   "pred": "TRUE"
-  },
-  "16419": {
-   "gold": "NOT ENOUGH INFO",
-   "pred": "FALSE"
-  },
-  "173046": {
-   "gold": "TRUE",
-   "pred": "TRUE"
-  },
-  "131530": {
-   "gold": "TRUE",
-   "pred": "TRUE"
-  },
-  "108917": {
-   "gold": "TRUE",
-   "pred": "NOT ENOUGH INFO"
-  },
-  "203373": {
-   "gold": "TRUE",
-   "pred": "TRUE"
-  },
-  "9891": {
-   "gold": "NOT ENOUGH INFO",
-   "pred": "TRUE"
-  },
-  "116366": {
-   "gold": "FALSE",
-   "pred": "NOT ENOUGH INFO"
-  },
-  "102818": {
-   "gold": "FALSE",
-   "pred": "TRUE"
-  },
-  "28380": {
-   "gold": "TRUE",
-   "pred": "NOT ENOUGH INFO"
-  },
-  "164638": {
-   "gold": "NOT ENOUGH INFO",
-   "pred": "TRUE"
-  },
-  "222045": {
-   "gold": "FALSE",
-   "pred": "NOT ENOUGH INFO"
-  },
-  "198534": {
-   "gold": "TRUE",
-   "pred": "NOT ENOUGH INFO"
-  },
-  "156457": {
-   "gold": "NOT ENOUGH INFO",
-   "pred": "FALSE"
-  },
-  "41097": {
-   "gold": "FALSE",
-   "pred": "FALSE"
-  },
-  "154086": {
-   "gold": "FALSE",
-   "pred": "TRUE"
-  },
-  "144983": {
-   "gold": "FALSE",
-   "pred": "FALSE"
-  },
-  "32233": {
-   "gold": "TRUE",
-   "pred": "TRUE"
-  },
-  "219194": {
-   "gold": "NOT ENOUGH INFO",
-   "pred": "TRUE"
-  },
-  "64599": {
-   "gold": "NOT ENOUGH INFO",
-   "pred": "FALSE"
-  },
-  "195827": {
-   "gold": "NOT ENOUGH INFO",
-   "pred": "NOT ENOUGH INFO"
-  },
-  "219682": {
-   "gold": "NOT ENOUGH INFO",
-   "pred": "TRUE"
-  },
-  "68232": {
-   "gold": "FALSE",
-   "pred": "FALSE"
-  },
-  "209354": {
-   "gold": "TRUE",
-   "pred": "TRUE"
-  },
-  "39405": {
-   "gold": "TRUE",
-   "pred": "NOT ENOUGH INFO"
-  },
-  "204331": {
-   "gold": "FALSE",
-   "pred": "TRUE"
-  },
-  "165264": {
-   "gold": "NOT ENOUGH INFO",
-   "pred": "TRUE"
-  },
-  "228339": {
-   "gold": "NOT ENOUGH INFO",
-   "pred": "TRUE"
-  },
-  "37539": {
-   "gold": "TRUE",
-   "pred": "NOT ENOUGH INFO"
-  },
-  "21320": {
-   "gold": "FALSE",
-   "pred": "FALSE"
-  },
-  "112564": {
-   "gold": "NOT ENOUGH INFO",
-   "pred": "FALSE"
-  },
-  "100243": {
-   "gold": "TRUE",
-   "pred": "FALSE"
-  },
-  "144993": {
-   "gold": "TRUE",
-   "pred": "TRUE"
-  },
-  "89815": {
-   "gold": "FALSE",
-   "pred": "FALSE"
-  },
-  "134097": {
-   "gold": "FALSE",
-   "pred": "FALSE"
-  },
-  "101142": {
-   "gold": "FALSE",
-   "pred": "FALSE"
-  },
-  "104530": {
-   "gold": "FALSE",
-   "pred": "FALSE"
-  },
-  "122277": {
-   "gold": "NOT ENOUGH INFO",
-   "pred": "TRUE"
-  },
-  "137780": {
-   "gold": "NOT ENOUGH INFO",
-   "pred": "NOT ENOUGH INFO"
-  },
-  "72006": {
-   "gold": "NOT ENOUGH INFO",
-   "pred": "NOT ENOUGH INFO"
-  },
-  "170016": {
-   "gold": "TRUE",
-   "pred": "TRUE"
-  },
-  "191265": {
-   "gold": "NOT ENOUGH INFO",
-   "pred": "NOT ENOUGH INFO"
-  },
-  "92313": {
-   "gold": "NOT ENOUGH INFO",
-   "pred": "TRUE"
-  },
-  "129074": {
-   "gold": "NOT ENOUGH INFO",
-   "pred": "TRUE"
-  },
-  "177854": {
-   "gold": "NOT ENOUGH INFO",
-   "pred": "TRUE"
-  },
-  "127588": {
-   "gold": "NOT ENOUGH INFO",
-   "pred": "NOT ENOUGH INFO"
-  },
-  "19417": {
-   "gold": "TRUE",
-   "pred": "TRUE"
-  },
-  "54511": {
-   "gold": "NOT ENOUGH INFO",
-   "pred": "TRUE"
-  },
-  "183464": {
-   "gold": "FALSE",
-   "pred": "TRUE"
-  },
-  "10455": {
-   "gold": "FALSE",
-   "pred": "TRUE"
-  },
-  "185412": {
-   "gold": "FALSE",
-   "pred": "NOT ENOUGH INFO"
-  },
-  "103893": {
-   "gold": "FALSE",
-   "pred": "TRUE"
-  },
-  "138375": {
-   "gold": "TRUE",
-   "pred": "TRUE"
-  },
-  "128459": {
-   "gold": "FALSE",
-   "pred": "FALSE"
-  },
-  "166851": {
-   "gold": "TRUE",
-   "pred": "TRUE"
-  },
-  "35553": {
-   "gold": "NOT ENOUGH INFO",
-   "pred": "FALSE"
-  },
-  "136958": {
-   "gold": "NOT ENOUGH INFO",
-   "pred": "TRUE"
-  },
-  "92498": {
-   "gold": "FALSE",
-   "pred": "FALSE"
-  },
-  "14731": {
-   "gold": "FALSE",
-   "pred": "FALSE"
-  },
-  "108297": {
-   "gold": "TRUE",
-   "pred": "TRUE"
-  },
-  "4618": {
-   "gold": "NOT ENOUGH INFO",
-   "pred": "NOT ENOUGH INFO"
-  },
-  "86933": {
-   "gold": "NOT ENOUGH INFO",
-   "pred": "NOT ENOUGH INFO"
-  },
-  "76847": {
-   "gold": "NOT ENOUGH INFO",
-   "pred": "NOT ENOUGH INFO"
-  },
-  "88208": {
-   "gold": "NOT ENOUGH INFO",
-   "pred": "TRUE"
-  },
-  "195019": {
-   "gold": "NOT ENOUGH INFO",
-   "pred": "TRUE"
-  },
-  "123753": {
-   "gold": "FALSE",
-   "pred": "FALSE"
-  },
-  "77473": {
-   "gold": "FALSE",
-   "pred": "TRUE"
-  },
-  "193873": {
-   "gold": "TRUE",
-   "pred": "NOT ENOUGH INFO"
-  },
-  "125865": {
-   "gold": "TRUE",
-   "pred": "NOT ENOUGH INFO"
-  },
-  "120065": {
-   "gold": "NOT ENOUGH INFO",
-   "pred": "TRUE"
-  },
-  "171637": {
-   "gold": "TRUE",
-   "pred": "NOT ENOUGH INFO"
-  },
-  "154072": {
-   "gold": "FALSE",
-   "pred": "FALSE"
-  },
-  "79900": {
-   "gold": "NOT ENOUGH INFO",
-   "pred": "TRUE"
-  },
-  "36882": {
-   "gold": "FALSE",
-   "pred": "FALSE"
-  },
-  "47765": {
-   "gold": "TRUE",
-   "pred": "NOT ENOUGH INFO"
-  },
-  "68784": {
-   "gold": "TRUE",
-   "pred": "TRUE"
-  },
-  "121486": {
-   "gold": "FALSE",
-   "pred": "FALSE"
-  },
-  "49542": {
-   "gold": "TRUE",
-   "pred": "TRUE"
-  },
-  "45143": {
-   "gold": "TRUE",
-   "pred": "NOT ENOUGH INFO"
-  },
-  "186598": {
-   "gold": "TRUE",
-   "pred": "FALSE"
-  },
-  "191261": {
-   "gold": "FALSE",
-   "pred": "NOT ENOUGH INFO"
-  },
-  "88875": {
-   "gold": "FALSE",
-   "pred": "NOT ENOUGH INFO"
-  },
-  "100899": {
-   "gold": "NOT ENOUGH INFO",
-   "pred": "FALSE"
-  },
-  "203000": {
-   "gold": "FALSE",
-   "pred": "FALSE"
-  },
-  "2405": {
-   "gold": "TRUE",
-   "pred": "TRUE"
-  },
-  "156656": {
-   "gold": "TRUE",
-   "pred": "TRUE"
-  },
-  "161195": {
-   "gold": "FALSE",
-   "pred": "NOT ENOUGH INFO"
-  },
-  "68507": {
-   "gold": "TRUE",
-   "pred": "TRUE"
-  },
-  "13201": {
-   "gold": "TRUE",
-   "pred": "NOT ENOUGH INFO"
-  },
-  "195812": {
-   "gold": "FALSE",
-   "pred": "NOT ENOUGH INFO"
-  },
-  "112270": {
-   "gold": "FALSE",
-   "pred": "FALSE"
-  },
-  "189872": {
-   "gold": "NOT ENOUGH INFO",
-   "pred": "TRUE"
-  },
-  "137980": {
-   "gold": "NOT ENOUGH INFO",
-   "pred": "NOT ENOUGH INFO"
-  },
-  "75385": {
-   "gold": "TRUE",
-   "pred": "TRUE"
-  },
-  "51973": {
-   "gold": "NOT ENOUGH INFO",
-   "pred": "FALSE"
-  },
-  "202760": {
-   "gold": "TRUE",
-   "pred": "NOT ENOUGH INFO"
-  },
-  "110110": {
-   "gold": "FALSE",
-   "pred": "FALSE"
-  },
-  "158310": {
-   "gold": "NOT ENOUGH INFO",
-   "pred": "NOT ENOUGH INFO"
-  },
-  "19671": {
-   "gold": "TRUE",
-   "pred": "TRUE"
-  },
-  "145723": {
-   "gold": "FALSE",
-   "pred": "TRUE"
-  },
-  "22861": {
-   "gold": "FALSE",
-   "pred": "FALSE"
-  },
-  "5985": {
-   "gold": "TRUE",
-   "pred": "TRUE"
-  },
-  "6270": {
-   "gold": "TRUE",
-   "pred": "TRUE"
-  },
-  "74427": {
-   "gold": "TRUE",
-   "pred": "TRUE"
-  },
-  "129445": {
-   "gold": "NOT ENOUGH INFO",
-   "pred": "NOT ENOUGH INFO"
-  },
-  "74675": {
-   "gold": "NOT ENOUGH INFO",
-   "pred": "TRUE"
-  },
-  "107547": {
-   "gold": "TRUE",
-   "pred": "TRUE"
-  },
-  "220245": {
-   "gold": "NOT ENOUGH INFO",
-   "pred": "TRUE"
-  },
-  "47341": {
-   "gold": "NOT ENOUGH INFO",
-   "pred": "TRUE"
-  },
-  "195840": {
-   "gold": "NOT ENOUGH INFO",
-   "pred": "NOT ENOUGH INFO"
-  },
-  "113686": {
-   "gold": "TRUE",
-   "pred": "TRUE"
-  },
-  "74440": {
-   "gold": "TRUE",
-   "pred": "TRUE"
-  },
-  "52040": {
-   "gold": "TRUE",
-   "pred": "TRUE"
-  },
-  "224368": {
-   "gold": "NOT ENOUGH INFO",
-   "pred": "FALSE"
-  },
-  "194249": {
-   "gold": "FALSE",
-   "pred": "FALSE"
-  },
-  "6032": {
-   "gold": "FALSE",
-   "pred": "FALSE"
-  },
-  "178856": {
-   "gold": "TRUE",
-   "pred": "TRUE"
-  },
-  "13894": {
-   "gold": "TRUE",
-   "pred": "TRUE"
-  },
-  "154009": {
-   "gold": "FALSE",
-   "pred": "NOT ENOUGH INFO"
-  },
-  "37710": {
-   "gold": "TRUE",
-   "pred": "TRUE"
-  },
-  "175438": {
-   "gold": "TRUE",
-   "pred": "TRUE"
-  },
-  "10738": {
-   "gold": "TRUE",
-   "pred": "TRUE"
-  },
-  "156075": {
-   "gold": "FALSE",
-   "pred": "FALSE"
-  },
-  "173116": {
-   "gold": "TRUE",
-   "pred": "NOT ENOUGH INFO"
-  },
-  "212234": {
-   "gold": "NOT ENOUGH INFO",
-   "pred": "FALSE"
-  },
-  "80605": {
-   "gold": "NOT ENOUGH INFO",
-   "pred": "FALSE"
-  },
-  "79392": {
-   "gold": "FALSE",
-   "pred": "FALSE"
-  },
-  "178336": {
-   "gold": "NOT ENOUGH INFO",
-   "pred": "NOT ENOUGH INFO"
-  },
-  "191891": {
-   "gold": "TRUE",
-   "pred": "TRUE"
-  },
-  "89681": {
-   "gold": "FALSE",
-   "pred": "FALSE"
-  },
-  "28672": {
-   "gold": "NOT ENOUGH INFO",
-   "pred": "NOT ENOUGH INFO"
-  },
-  "160058": {
-   "gold": "FALSE",
-   "pred": "FALSE"
-  },
-  "179740": {
-   "gold": "NOT ENOUGH INFO",
-   "pred": "NOT ENOUGH INFO"
-  },
-  "199274": {
-   "gold": "NOT ENOUGH INFO",
-   "pred": "FALSE"
-  },
-  "193884": {
-   "gold": "TRUE",
-   "pred": "NOT ENOUGH INFO"
-  },
-  "13830": {
-   "gold": "FALSE",
-   "pred": "NOT ENOUGH INFO"
-  },
-  "193422": {
-   "gold": "FALSE",
-   "pred": "FALSE"
-  },
-  "19091": {
-   "gold": "NOT ENOUGH INFO",
-   "pred": "TRUE"
-  },
-  "165700": {
-   "gold": "NOT ENOUGH INFO",
-   "pred": "TRUE"
-  },
-  "149038": {
-   "gold": "FALSE",
-   "pred": "FALSE"
-  },
-  "68913": {
-   "gold": "FALSE",
-   "pred": "FALSE"
-  },
-  "36499": {
-   "gold": "NOT ENOUGH INFO",
-   "pred": "TRUE"
-  },
-  "1989": {
-   "gold": "TRUE",
-   "pred": "NOT ENOUGH INFO"
-  },
-  "135364": {
-   "gold": "NOT ENOUGH INFO",
-   "pred": "TRUE"
-  },
-  "18294": {
-   "gold": "TRUE",
-   "pred": "TRUE"
-  },
-  "191444": {
-   "gold": "NOT ENOUGH INFO",
-   "pred": "TRUE"
-  },
-  "111646": {
-   "gold": "FALSE",
-   "pred": "TRUE"
-  },
-  "180691": {
-   "gold": "TRUE",
-   "pred": "NOT ENOUGH INFO"
-  },
-  "165891": {
-   "gold": "FALSE",
-   "pred": "NOT ENOUGH INFO"
-  },
-  "142120": {
-   "gold": "FALSE",
-   "pred": "FALSE"
-  },
-  "53901": {
-   "gold": "TRUE",
-   "pred": "NOT ENOUGH INFO"
-  },
-  "126652": {
-   "gold": "TRUE",
-   "pred": "NOT ENOUGH INFO"
-  },
-  "194462": {
-   "gold": "NOT ENOUGH INFO",
-   "pred": "NOT ENOUGH INFO"
-  },
-  "227088": {
-   "gold": "TRUE",
-   "pred": "TRUE"
-  },
-  "173932": {
-   "gold": "NOT ENOUGH INFO",
-   "pred": "NOT ENOUGH INFO"
-  },
-  "90930": {
-   "gold": "NOT ENOUGH INFO",
-   "pred": "NOT ENOUGH INFO"
-  },
-  "80880": {
-   "gold": "NOT ENOUGH INFO",
-   "pred": "TRUE"
-  },
-  "93660": {
-   "gold": "TRUE",
-   "pred": "TRUE"
-  },
-  "195933": {
-   "gold": "TRUE",
-   "pred": "TRUE"
-  },
-  "14730": {
-   "gold": "TRUE",
-   "pred": "TRUE"
-  },
-  "54411": {
-   "gold": "TRUE",
-   "pred": "FALSE"
-  },
-  "156096": {
-   "gold": "NOT ENOUGH INFO",
-   "pred": "NOT ENOUGH INFO"
-  },
-  "168999": {
-   "gold": "FALSE",
-   "pred": "NOT ENOUGH INFO"
-  },
-  "183930": {
-   "gold": "NOT ENOUGH INFO",
-   "pred": "NOT ENOUGH INFO"
-  },
-  "193874": {
-   "gold": "TRUE",
-   "pred": "NOT ENOUGH INFO"
-  },
-  "203003": {
-   "gold": "NOT ENOUGH INFO",
-   "pred": "TRUE"
-  },
-  "99974": {
-   "gold": "FALSE",
-   "pred": "TRUE"
-  },
-  "136725": {
-   "gold": "FALSE",
-   "pred": "FALSE"
-  },
-  "48684": {
-   "gold": "TRUE",
-   "pred": "NOT ENOUGH INFO"
-  },
-  "157641": {
-   "gold": "FALSE",
-   "pred": "NOT ENOUGH INFO"
-  },
-  "28325": {
-   "gold": "FALSE",
-   "pred": "NOT ENOUGH INFO"
-  },
-  "68341": {
-   "gold": "NOT ENOUGH INFO",
-   "pred": "FALSE"
-  },
-  "92444": {
-   "gold": "FALSE",
-   "pred": "NOT ENOUGH INFO"
-  },
-  "56669": {
-   "gold": "NOT ENOUGH INFO",
-   "pred": "TRUE"
-  },
-  "126140": {
-   "gold": "NOT ENOUGH INFO",
-   "pred": "TRUE"
-  },
-  "89777": {
-   "gold": "FALSE",
-   "pred": "FALSE"
-  },
-  "207676": {
-   "gold": "TRUE",
-   "pred": "NOT ENOUGH INFO"
-  },
-  "46911": {
-   "gold": "TRUE",
-   "pred": "TRUE"
-  },
-  "183140": {
-   "gold": "NOT ENOUGH INFO",
-   "pred": "FALSE"
-  },
-  "128336": {
-   "gold": "TRUE",
-   "pred": "NOT ENOUGH INFO"
-  },
-  "179332": {
-   "gold": "FALSE",
-   "pred": "FALSE"
-  },
-  "135519": {
-   "gold": "FALSE",
-   "pred": "FALSE"
-  },
-  "94829": {
-   "gold": "FALSE",
-   "pred": "NOT ENOUGH INFO"
-  },
-  "204441": {
-   "gold": "NOT ENOUGH INFO",
-   "pred": "NOT ENOUGH INFO"
-  },
-  "94310": {
-   "gold": "NOT ENOUGH INFO",
-   "pred": "TRUE"
-  },
-  "162213": {
-   "gold": "FALSE",
-   "pred": "NOT ENOUGH INFO"
-  },
-  "112185": {
-   "gold": "NOT ENOUGH INFO",
-   "pred": "NOT ENOUGH INFO"
-  },
-  "91705": {
-   "gold": "TRUE",
-   "pred": "NOT ENOUGH INFO"
-  },
-  "21564": {
-   "gold": "TRUE",
-   "pred": "TRUE"
-  },
-  "23430": {
-   "gold": "NOT ENOUGH INFO",
-   "pred": "NOT ENOUGH INFO"
-  },
-  "117380": {
-   "gold": "TRUE",
-   "pred": "TRUE"
-  },
-  "106809": {
-   "gold": "FALSE",
-   "pred": "FALSE"
-  },
-  "195922": {
-   "gold": "FALSE",
-   "pred": "TRUE"
-  },
-  "54257": {
-   "gold": "TRUE",
-   "pred": "TRUE"
-  },
-  "173930": {
-   "gold": "TRUE",
-   "pred": "NOT ENOUGH INFO"
-  },
-  "202314": {
-   "gold": "FALSE",
-   "pred": "FALSE"
-  },
-  "42840": {
-   "gold": "NOT ENOUGH INFO",
-   "pred": "TRUE"
-  },
-  "70784": {
-   "gold": "TRUE",
-   "pred": "TRUE"
-  },
-  "82492": {
-   "gold": "TRUE",
-   "pred": "TRUE"
-  },
-  "124730": {
-   "gold": "FALSE",
-   "pred": "FALSE"
-  },
-  "204430": {
-   "gold": "NOT ENOUGH INFO",
-   "pred": "FALSE"
-  },
-  "66692": {
-   "gold": "FALSE",
-   "pred": "FALSE"
-  },
-  "115940": {
-   "gold": "TRUE",
-   "pred": "NOT ENOUGH INFO"
-  },
-  "153147": {
-   "gold": "FALSE",
-   "pred": "TRUE"
-  },
-  "204325": {
-   "gold": "FALSE",
-   "pred": "FALSE"
-  },
-  "129632": {
-   "gold": "TRUE",
-   "pred": "TRUE"
-  },
-  "215230": {
-   "gold": "TRUE",
-   "pred": "NOT ENOUGH INFO"
-  },
-  "152559": {
-   "gold": "NOT ENOUGH INFO",
-   "pred": "TRUE"
-  },
-  "77250": {
-   "gold": "NOT ENOUGH INFO",
-   "pred": "TRUE"
-  },
-  "203009": {
-   "gold": "TRUE",
-   "pred": "NOT ENOUGH INFO"
-  },
-  "80909": {
-   "gold": "FALSE",
-   "pred": "FALSE"
-  },
-  "164883": {
-   "gold": "TRUE",
-   "pred": "TRUE"
-  },
-  "34942": {
-   "gold": "NOT ENOUGH INFO",
-   "pred": "NOT ENOUGH INFO"
-  },
-  "187557": {
-   "gold": "FALSE",
-   "pred": "NOT ENOUGH INFO"
-  },
-  "44950": {
-   "gold": "TRUE",
-   "pred": "TRUE"
-  },
-  "115283": {
-   "gold": "FALSE",
-   "pred": "NOT ENOUGH INFO"
-  },
-  "126678": {
-   "gold": "FALSE",
-   "pred": "NOT ENOUGH INFO"
-  },
-  "76097": {
-   "gold": "FALSE",
-   "pred": "FALSE"
-  },
-  "161796": {
-   "gold": "NOT ENOUGH INFO",
-   "pred": "FALSE"
-  },
-  "205289": {
-   "gold": "NOT ENOUGH INFO",
-   "pred": "FALSE"
-  },
-  "201751": {
-   "gold": "TRUE",
-   "pred": "FALSE"
-  },
-  "26820": {
-   "gold": "TRUE",
-   "pred": "TRUE"
-  },
-  "3338": {
-   "gold": "FALSE",
-   "pred": "FALSE"
-  },
-  "76562": {
-   "gold": "FALSE",
-   "pred": "TRUE"
-  },
-  "85256": {
-   "gold": "NOT ENOUGH INFO",
-   "pred": "NOT ENOUGH INFO"
-  },
-  "22692": {
-   "gold": "NOT ENOUGH INFO",
-   "pred": "FALSE"
-  },
-  "189867": {
-   "gold": "FALSE",
-   "pred": "FALSE"
-  },
-  "84332": {
-   "gold": "NOT ENOUGH INFO",
-   "pred": "NOT ENOUGH INFO"
-  },
-  "67876": {
-   "gold": "FALSE",
-   "pred": "FALSE"
-  },
-  "92374": {
-   "gold": "TRUE",
-   "pred": "TRUE"
-  },
-  "187318": {
-   "gold": "FALSE",
-   "pred": "FALSE"
-  },
-  "22741": {
-   "gold": "NOT ENOUGH INFO",
-   "pred": "TRUE"
-  },
-  "169018": {
-   "gold": "FALSE",
-   "pred": "FALSE"
-  },
-  "143044": {
-   "gold": "NOT ENOUGH INFO",
-   "pred": "NOT ENOUGH INFO"
-  },
-  "41980": {
-   "gold": "TRUE",
-   "pred": "FALSE"
-  },
-  "196971": {
-   "gold": "TRUE",
-   "pred": "TRUE"
-  },
-  "204548": {
-   "gold": "FALSE",
-   "pred": "FALSE"
-  },
-  "153146": {
-   "gold": "NOT ENOUGH INFO",
-   "pred": "TRUE"
-  },
-  "75535": {
-   "gold": "FALSE",
-   "pred": "FALSE"
-  },
-  "123702": {
-   "gold": "NOT ENOUGH INFO",
-   "pred": "FALSE"
-  },
-  "67011": {
-   "gold": "TRUE",
-   "pred": "NOT ENOUGH INFO"
-  },
-  "19766": {
-   "gold": "FALSE",
-   "pred": "TRUE"
-  },
-  "216401": {
-   "gold": "TRUE",
-   "pred": "NOT ENOUGH INFO"
-  },
-  "186588": {
-   "gold": "TRUE",
-   "pred": "NOT ENOUGH INFO"
-  },
-  "57433": {
-   "gold": "TRUE",
-   "pred": "TRUE"
-  },
-  "177868": {
-   "gold": "NOT ENOUGH INFO",
-   "pred": "NOT ENOUGH INFO"
-  },
-  "183504": {
-   "gold": "NOT ENOUGH INFO",
-   "pred": "NOT ENOUGH INFO"
-  },
-  "75466": {
-   "gold": "NOT ENOUGH INFO",
-   "pred": "TRUE"
-  },
-  "85274": {
-   "gold": "TRUE",
-   "pred": "TRUE"
-  },
-  "110681": {
-   "gold": "FALSE",
-   "pred": "NOT ENOUGH INFO"
-  },
-  "141936": {
-   "gold": "NOT ENOUGH INFO",
-   "pred": "FALSE"
-  },
-  "185415": {
-   "gold": "FALSE",
-   "pred": "NOT ENOUGH INFO"
-  },
-  "140664": {
-   "gold": "FALSE",
-   "pred": "NOT ENOUGH INFO"
-  },
-  "148776": {
-   "gold": "TRUE",
-   "pred": "TRUE"
-  },
-  "109898": {
-   "gold": "FALSE",
-   "pred": "FALSE"
+  "source": "tests/test_fever_suite.py --verifier MoritzLaurer/DeBERTa-v3-base-mnli-fever-anli, run 2026-11-25T15:34:12 (re-baselined from benchmark run 20261124-220309: same claims, hits and retrieval; verifier changed from the old deberta_v1 checkpoint)",
+  "verifier": "MoritzLaurer/DeBERTa-v3-base-mnli-fever-anli",
+  "retriever": "hybrid_norm3",
+  "bases": [
+    "faiss",
+    "bm25_norm3"
+  ],
+  "bm25_rm3": false,
+  "claims_file": "claims_validation_n300_seed0_cov.parquet",
+  "claims_key": "367fb1deca",
+  "candidates": 100,
+  "rrf_k": 60,
+  "k": 30,
+  "conf_threshold": 0.5,
+  "retrieval": {
+    "mrr": 0.4721444824596789,
+    "hit@1": 0.335,
+    "recall_set@1": 0.3,
+    "recall@1": 0.3116666666666667,
+    "precision@1": 0.335,
+    "f1@1": 0.3180952380952381,
+    "hit@5": 0.645,
+    "recall_set@5": 0.575,
+    "recall@5": 0.6029166666666667,
+    "precision@5": 0.135,
+    "f1@5": 0.21678210678210683,
+    "hit@10": 0.745,
+    "recall_set@10": 0.66,
+    "recall@10": 0.69375,
+    "precision@10": 0.0785,
+    "f1@10": 0.13933462370962374,
+    "hit@20": 0.805,
+    "recall_set@20": 0.7,
+    "recall@20": 0.7412878787878787,
+    "precision@20": 0.0425,
+    "f1@20": 0.07960630416801524,
+    "hit@50": 0.89,
+    "recall_set@50": 0.78,
+    "recall@50": 0.8243712121212121,
+    "precision@50": 0.0194,
+    "f1@50": 0.03770248089846076,
+    "n": 200
+  },
+  "e2e": {
+    "label_accuracy": 0.64,
+    "fever_score": 0.48333333333333334,
+    "evidence_precision": 0.16666666666666666,
+    "evidence_recall": 0.49504950495049505,
+    "evidence_f1": 0.24937655860349128
+  },
+  "predictions": {
+    "193899": {
+      "gold": "NOT ENOUGH INFO",
+      "pred": "FALSE"
+    },
+    "127225": {
+      "gold": "FALSE",
+      "pred": "NOT ENOUGH INFO"
+    },
+    "204361": {
+      "gold": "TRUE",
+      "pred": "TRUE"
+    },
+    "225729": {
+      "gold": "NOT ENOUGH INFO",
+      "pred": "FALSE"
+    },
+    "179822": {
+      "gold": "NOT ENOUGH INFO",
+      "pred": "FALSE"
+    },
+    "153361": {
+      "gold": "FALSE",
+      "pred": "FALSE"
+    },
+    "42319": {
+      "gold": "NOT ENOUGH INFO",
+      "pred": "TRUE"
+    },
+    "19764": {
+      "gold": "NOT ENOUGH INFO",
+      "pred": "NOT ENOUGH INFO"
+    },
+    "209355": {
+      "gold": "TRUE",
+      "pred": "TRUE"
+    },
+    "120846": {
+      "gold": "FALSE",
+      "pred": "TRUE"
+    },
+    "185778": {
+      "gold": "NOT ENOUGH INFO",
+      "pred": "TRUE"
+    },
+    "33171": {
+      "gold": "TRUE",
+      "pred": "TRUE"
+    },
+    "10205": {
+      "gold": "FALSE",
+      "pred": "FALSE"
+    },
+    "84194": {
+      "gold": "NOT ENOUGH INFO",
+      "pred": "TRUE"
+    },
+    "162895": {
+      "gold": "TRUE",
+      "pred": "TRUE"
+    },
+    "105702": {
+      "gold": "TRUE",
+      "pred": "TRUE"
+    },
+    "160366": {
+      "gold": "NOT ENOUGH INFO",
+      "pred": "NOT ENOUGH INFO"
+    },
+    "2295": {
+      "gold": "TRUE",
+      "pred": "TRUE"
+    },
+    "132089": {
+      "gold": "NOT ENOUGH INFO",
+      "pred": "NOT ENOUGH INFO"
+    },
+    "143803": {
+      "gold": "FALSE",
+      "pred": "NOT ENOUGH INFO"
+    },
+    "212768": {
+      "gold": "FALSE",
+      "pred": "TRUE"
+    },
+    "131513": {
+      "gold": "FALSE",
+      "pred": "TRUE"
+    },
+    "135968": {
+      "gold": "FALSE",
+      "pred": "FALSE"
+    },
+    "172487": {
+      "gold": "FALSE",
+      "pred": "FALSE"
+    },
+    "143420": {
+      "gold": "NOT ENOUGH INFO",
+      "pred": "NOT ENOUGH INFO"
+    },
+    "145424": {
+      "gold": "FALSE",
+      "pred": "FALSE"
+    },
+    "162200": {
+      "gold": "FALSE",
+      "pred": "FALSE"
+    },
+    "95070": {
+      "gold": "NOT ENOUGH INFO",
+      "pred": "FALSE"
+    },
+    "195384": {
+      "gold": "NOT ENOUGH INFO",
+      "pred": "NOT ENOUGH INFO"
+    },
+    "119942": {
+      "gold": "NOT ENOUGH INFO",
+      "pred": "NOT ENOUGH INFO"
+    },
+    "177867": {
+      "gold": "TRUE",
+      "pred": "TRUE"
+    },
+    "13085": {
+      "gold": "TRUE",
+      "pred": "TRUE"
+    },
+    "223670": {
+      "gold": "TRUE",
+      "pred": "TRUE"
+    },
+    "84516": {
+      "gold": "FALSE",
+      "pred": "FALSE"
+    },
+    "111816": {
+      "gold": "NOT ENOUGH INFO",
+      "pred": "NOT ENOUGH INFO"
+    },
+    "157977": {
+      "gold": "FALSE",
+      "pred": "FALSE"
+    },
+    "51526": {
+      "gold": "FALSE",
+      "pred": "TRUE"
+    },
+    "76433": {
+      "gold": "FALSE",
+      "pred": "FALSE"
+    },
+    "83010": {
+      "gold": "NOT ENOUGH INFO",
+      "pred": "NOT ENOUGH INFO"
+    },
+    "41780": {
+      "gold": "TRUE",
+      "pred": "FALSE"
+    },
+    "129541": {
+      "gold": "NOT ENOUGH INFO",
+      "pred": "FALSE"
+    },
+    "34162": {
+      "gold": "TRUE",
+      "pred": "TRUE"
+    },
+    "84420": {
+      "gold": "TRUE",
+      "pred": "TRUE"
+    },
+    "103840": {
+      "gold": "TRUE",
+      "pred": "NOT ENOUGH INFO"
+    },
+    "182701": {
+      "gold": "TRUE",
+      "pred": "TRUE"
+    },
+    "90230": {
+      "gold": "FALSE",
+      "pred": "NOT ENOUGH INFO"
+    },
+    "16419": {
+      "gold": "NOT ENOUGH INFO",
+      "pred": "FALSE"
+    },
+    "173046": {
+      "gold": "TRUE",
+      "pred": "FALSE"
+    },
+    "131530": {
+      "gold": "TRUE",
+      "pred": "TRUE"
+    },
+    "108917": {
+      "gold": "TRUE",
+      "pred": "NOT ENOUGH INFO"
+    },
+    "203373": {
+      "gold": "TRUE",
+      "pred": "TRUE"
+    },
+    "9891": {
+      "gold": "NOT ENOUGH INFO",
+      "pred": "TRUE"
+    },
+    "116366": {
+      "gold": "FALSE",
+      "pred": "NOT ENOUGH INFO"
+    },
+    "102818": {
+      "gold": "FALSE",
+      "pred": "TRUE"
+    },
+    "28380": {
+      "gold": "TRUE",
+      "pred": "TRUE"
+    },
+    "164638": {
+      "gold": "NOT ENOUGH INFO",
+      "pred": "NOT ENOUGH INFO"
+    },
+    "222045": {
+      "gold": "FALSE",
+      "pred": "FALSE"
+    },
+    "198534": {
+      "gold": "TRUE",
+      "pred": "TRUE"
+    },
+    "156457": {
+      "gold": "NOT ENOUGH INFO",
+      "pred": "TRUE"
+    },
+    "41097": {
+      "gold": "FALSE",
+      "pred": "TRUE"
+    },
+    "154086": {
+      "gold": "FALSE",
+      "pred": "NOT ENOUGH INFO"
+    },
+    "144983": {
+      "gold": "FALSE",
+      "pred": "FALSE"
+    },
+    "32233": {
+      "gold": "TRUE",
+      "pred": "TRUE"
+    },
+    "219194": {
+      "gold": "NOT ENOUGH INFO",
+      "pred": "TRUE"
+    },
+    "64599": {
+      "gold": "NOT ENOUGH INFO",
+      "pred": "NOT ENOUGH INFO"
+    },
+    "195827": {
+      "gold": "NOT ENOUGH INFO",
+      "pred": "TRUE"
+    },
+    "219682": {
+      "gold": "NOT ENOUGH INFO",
+      "pred": "TRUE"
+    },
+    "68232": {
+      "gold": "FALSE",
+      "pred": "FALSE"
+    },
+    "209354": {
+      "gold": "TRUE",
+      "pred": "TRUE"
+    },
+    "39405": {
+      "gold": "TRUE",
+      "pred": "NOT ENOUGH INFO"
+    },
+    "204331": {
+      "gold": "FALSE",
+      "pred": "TRUE"
+    },
+    "165264": {
+      "gold": "NOT ENOUGH INFO",
+      "pred": "TRUE"
+    },
+    "228339": {
+      "gold": "NOT ENOUGH INFO",
+      "pred": "TRUE"
+    },
+    "37539": {
+      "gold": "TRUE",
+      "pred": "TRUE"
+    },
+    "21320": {
+      "gold": "FALSE",
+      "pred": "FALSE"
+    },
+    "112564": {
+      "gold": "NOT ENOUGH INFO",
+      "pred": "FALSE"
+    },
+    "100243": {
+      "gold": "TRUE",
+      "pred": "TRUE"
+    },
+    "144993": {
+      "gold": "TRUE",
+      "pred": "TRUE"
+    },
+    "89815": {
+      "gold": "FALSE",
+      "pred": "FALSE"
+    },
+    "134097": {
+      "gold": "FALSE",
+      "pred": "FALSE"
+    },
+    "101142": {
+      "gold": "FALSE",
+      "pred": "FALSE"
+    },
+    "104530": {
+      "gold": "FALSE",
+      "pred": "FALSE"
+    },
+    "122277": {
+      "gold": "NOT ENOUGH INFO",
+      "pred": "TRUE"
+    },
+    "137780": {
+      "gold": "NOT ENOUGH INFO",
+      "pred": "NOT ENOUGH INFO"
+    },
+    "72006": {
+      "gold": "NOT ENOUGH INFO",
+      "pred": "NOT ENOUGH INFO"
+    },
+    "170016": {
+      "gold": "TRUE",
+      "pred": "TRUE"
+    },
+    "191265": {
+      "gold": "NOT ENOUGH INFO",
+      "pred": "NOT ENOUGH INFO"
+    },
+    "92313": {
+      "gold": "NOT ENOUGH INFO",
+      "pred": "TRUE"
+    },
+    "129074": {
+      "gold": "NOT ENOUGH INFO",
+      "pred": "TRUE"
+    },
+    "177854": {
+      "gold": "NOT ENOUGH INFO",
+      "pred": "TRUE"
+    },
+    "127588": {
+      "gold": "NOT ENOUGH INFO",
+      "pred": "TRUE"
+    },
+    "19417": {
+      "gold": "TRUE",
+      "pred": "TRUE"
+    },
+    "54511": {
+      "gold": "NOT ENOUGH INFO",
+      "pred": "NOT ENOUGH INFO"
+    },
+    "183464": {
+      "gold": "FALSE",
+      "pred": "FALSE"
+    },
+    "10455": {
+      "gold": "FALSE",
+      "pred": "TRUE"
+    },
+    "185412": {
+      "gold": "FALSE",
+      "pred": "TRUE"
+    },
+    "103893": {
+      "gold": "FALSE",
+      "pred": "FALSE"
+    },
+    "138375": {
+      "gold": "TRUE",
+      "pred": "TRUE"
+    },
+    "128459": {
+      "gold": "FALSE",
+      "pred": "FALSE"
+    },
+    "166851": {
+      "gold": "TRUE",
+      "pred": "TRUE"
+    },
+    "35553": {
+      "gold": "NOT ENOUGH INFO",
+      "pred": "NOT ENOUGH INFO"
+    },
+    "136958": {
+      "gold": "NOT ENOUGH INFO",
+      "pred": "FALSE"
+    },
+    "92498": {
+      "gold": "FALSE",
+      "pred": "FALSE"
+    },
+    "14731": {
+      "gold": "FALSE",
+      "pred": "NOT ENOUGH INFO"
+    },
+    "108297": {
+      "gold": "TRUE",
+      "pred": "FALSE"
+    },
+    "4618": {
+      "gold": "NOT ENOUGH INFO",
+      "pred": "TRUE"
+    },
+    "86933": {
+      "gold": "NOT ENOUGH INFO",
+      "pred": "FALSE"
+    },
+    "76847": {
+      "gold": "NOT ENOUGH INFO",
+      "pred": "NOT ENOUGH INFO"
+    },
+    "88208": {
+      "gold": "NOT ENOUGH INFO",
+      "pred": "TRUE"
+    },
+    "195019": {
+      "gold": "NOT ENOUGH INFO",
+      "pred": "TRUE"
+    },
+    "123753": {
+      "gold": "FALSE",
+      "pred": "FALSE"
+    },
+    "77473": {
+      "gold": "FALSE",
+      "pred": "FALSE"
+    },
+    "193873": {
+      "gold": "TRUE",
+      "pred": "TRUE"
+    },
+    "125865": {
+      "gold": "TRUE",
+      "pred": "TRUE"
+    },
+    "120065": {
+      "gold": "NOT ENOUGH INFO",
+      "pred": "TRUE"
+    },
+    "171637": {
+      "gold": "TRUE",
+      "pred": "TRUE"
+    },
+    "154072": {
+      "gold": "FALSE",
+      "pred": "FALSE"
+    },
+    "79900": {
+      "gold": "NOT ENOUGH INFO",
+      "pred": "TRUE"
+    },
+    "36882": {
+      "gold": "FALSE",
+      "pred": "FALSE"
+    },
+    "47765": {
+      "gold": "TRUE",
+      "pred": "TRUE"
+    },
+    "68784": {
+      "gold": "TRUE",
+      "pred": "TRUE"
+    },
+    "121486": {
+      "gold": "FALSE",
+      "pred": "NOT ENOUGH INFO"
+    },
+    "49542": {
+      "gold": "TRUE",
+      "pred": "TRUE"
+    },
+    "45143": {
+      "gold": "TRUE",
+      "pred": "TRUE"
+    },
+    "186598": {
+      "gold": "TRUE",
+      "pred": "FALSE"
+    },
+    "191261": {
+      "gold": "FALSE",
+      "pred": "NOT ENOUGH INFO"
+    },
+    "88875": {
+      "gold": "FALSE",
+      "pred": "TRUE"
+    },
+    "100899": {
+      "gold": "NOT ENOUGH INFO",
+      "pred": "FALSE"
+    },
+    "203000": {
+      "gold": "FALSE",
+      "pred": "FALSE"
+    },
+    "2405": {
+      "gold": "TRUE",
+      "pred": "TRUE"
+    },
+    "156656": {
+      "gold": "TRUE",
+      "pred": "TRUE"
+    },
+    "161195": {
+      "gold": "FALSE",
+      "pred": "FALSE"
+    },
+    "68507": {
+      "gold": "TRUE",
+      "pred": "TRUE"
+    },
+    "13201": {
+      "gold": "TRUE",
+      "pred": "TRUE"
+    },
+    "195812": {
+      "gold": "FALSE",
+      "pred": "FALSE"
+    },
+    "112270": {
+      "gold": "FALSE",
+      "pred": "FALSE"
+    },
+    "189872": {
+      "gold": "NOT ENOUGH INFO",
+      "pred": "TRUE"
+    },
+    "137980": {
+      "gold": "NOT ENOUGH INFO",
+      "pred": "FALSE"
+    },
+    "75385": {
+      "gold": "TRUE",
+      "pred": "TRUE"
+    },
+    "51973": {
+      "gold": "NOT ENOUGH INFO",
+      "pred": "NOT ENOUGH INFO"
+    },
+    "202760": {
+      "gold": "TRUE",
+      "pred": "TRUE"
+    },
+    "110110": {
+      "gold": "FALSE",
+      "pred": "FALSE"
+    },
+    "158310": {
+      "gold": "NOT ENOUGH INFO",
+      "pred": "TRUE"
+    },
+    "19671": {
+      "gold": "TRUE",
+      "pred": "TRUE"
+    },
+    "145723": {
+      "gold": "FALSE",
+      "pred": "FALSE"
+    },
+    "22861": {
+      "gold": "FALSE",
+      "pred": "FALSE"
+    },
+    "5985": {
+      "gold": "TRUE",
+      "pred": "TRUE"
+    },
+    "6270": {
+      "gold": "TRUE",
+      "pred": "TRUE"
+    },
+    "74427": {
+      "gold": "TRUE",
+      "pred": "TRUE"
+    },
+    "129445": {
+      "gold": "NOT ENOUGH INFO",
+      "pred": "TRUE"
+    },
+    "74675": {
+      "gold": "NOT ENOUGH INFO",
+      "pred": "TRUE"
+    },
+    "107547": {
+      "gold": "TRUE",
+      "pred": "TRUE"
+    },
+    "220245": {
+      "gold": "NOT ENOUGH INFO",
+      "pred": "NOT ENOUGH INFO"
+    },
+    "47341": {
+      "gold": "NOT ENOUGH INFO",
+      "pred": "TRUE"
+    },
+    "195840": {
+      "gold": "NOT ENOUGH INFO",
+      "pred": "TRUE"
+    },
+    "113686": {
+      "gold": "TRUE",
+      "pred": "TRUE"
+    },
+    "74440": {
+      "gold": "TRUE",
+      "pred": "TRUE"
+    },
+    "52040": {
+      "gold": "TRUE",
+      "pred": "TRUE"
+    },
+    "224368": {
+      "gold": "NOT ENOUGH INFO",
+      "pred": "FALSE"
+    },
+    "194249": {
+      "gold": "FALSE",
+      "pred": "FALSE"
+    },
+    "6032": {
+      "gold": "FALSE",
+      "pred": "FALSE"
+    },
+    "178856": {
+      "gold": "TRUE",
+      "pred": "FALSE"
+    },
+    "13894": {
+      "gold": "TRUE",
+      "pred": "TRUE"
+    },
+    "154009": {
+      "gold": "FALSE",
+      "pred": "FALSE"
+    },
+    "37710": {
+      "gold": "TRUE",
+      "pred": "TRUE"
+    },
+    "175438": {
+      "gold": "TRUE",
+      "pred": "TRUE"
+    },
+    "10738": {
+      "gold": "TRUE",
+      "pred": "TRUE"
+    },
+    "156075": {
+      "gold": "FALSE",
+      "pred": "FALSE"
+    },
+    "173116": {
+      "gold": "TRUE",
+      "pred": "TRUE"
+    },
+    "212234": {
+      "gold": "NOT ENOUGH INFO",
+      "pred": "FALSE"
+    },
+    "80605": {
+      "gold": "NOT ENOUGH INFO",
+      "pred": "FALSE"
+    },
+    "79392": {
+      "gold": "FALSE",
+      "pred": "NOT ENOUGH INFO"
+    },
+    "178336": {
+      "gold": "NOT ENOUGH INFO",
+      "pred": "NOT ENOUGH INFO"
+    },
+    "191891": {
+      "gold": "TRUE",
+      "pred": "TRUE"
+    },
+    "89681": {
+      "gold": "FALSE",
+      "pred": "FALSE"
+    },
+    "28672": {
+      "gold": "NOT ENOUGH INFO",
+      "pred": "NOT ENOUGH INFO"
+    },
+    "160058": {
+      "gold": "FALSE",
+      "pred": "FALSE"
+    },
+    "179740": {
+      "gold": "NOT ENOUGH INFO",
+      "pred": "TRUE"
+    },
+    "199274": {
+      "gold": "NOT ENOUGH INFO",
+      "pred": "FALSE"
+    },
+    "193884": {
+      "gold": "TRUE",
+      "pred": "TRUE"
+    },
+    "13830": {
+      "gold": "FALSE",
+      "pred": "TRUE"
+    },
+    "193422": {
+      "gold": "FALSE",
+      "pred": "NOT ENOUGH INFO"
+    },
+    "19091": {
+      "gold": "NOT ENOUGH INFO",
+      "pred": "NOT ENOUGH INFO"
+    },
+    "165700": {
+      "gold": "NOT ENOUGH INFO",
+      "pred": "TRUE"
+    },
+    "149038": {
+      "gold": "FALSE",
+      "pred": "FALSE"
+    },
+    "68913": {
+      "gold": "FALSE",
+      "pred": "FALSE"
+    },
+    "36499": {
+      "gold": "NOT ENOUGH INFO",
+      "pred": "TRUE"
+    },
+    "1989": {
+      "gold": "TRUE",
+      "pred": "TRUE"
+    },
+    "135364": {
+      "gold": "NOT ENOUGH INFO",
+      "pred": "NOT ENOUGH INFO"
+    },
+    "18294": {
+      "gold": "TRUE",
+      "pred": "TRUE"
+    },
+    "191444": {
+      "gold": "NOT ENOUGH INFO",
+      "pred": "NOT ENOUGH INFO"
+    },
+    "111646": {
+      "gold": "FALSE",
+      "pred": "TRUE"
+    },
+    "180691": {
+      "gold": "TRUE",
+      "pred": "TRUE"
+    },
+    "165891": {
+      "gold": "FALSE",
+      "pred": "FALSE"
+    },
+    "142120": {
+      "gold": "FALSE",
+      "pred": "FALSE"
+    },
+    "53901": {
+      "gold": "TRUE",
+      "pred": "NOT ENOUGH INFO"
+    },
+    "126652": {
+      "gold": "TRUE",
+      "pred": "NOT ENOUGH INFO"
+    },
+    "194462": {
+      "gold": "NOT ENOUGH INFO",
+      "pred": "NOT ENOUGH INFO"
+    },
+    "227088": {
+      "gold": "TRUE",
+      "pred": "TRUE"
+    },
+    "173932": {
+      "gold": "NOT ENOUGH INFO",
+      "pred": "NOT ENOUGH INFO"
+    },
+    "90930": {
+      "gold": "NOT ENOUGH INFO",
+      "pred": "NOT ENOUGH INFO"
+    },
+    "80880": {
+      "gold": "NOT ENOUGH INFO",
+      "pred": "TRUE"
+    },
+    "93660": {
+      "gold": "TRUE",
+      "pred": "NOT ENOUGH INFO"
+    },
+    "195933": {
+      "gold": "TRUE",
+      "pred": "TRUE"
+    },
+    "14730": {
+      "gold": "TRUE",
+      "pred": "TRUE"
+    },
+    "54411": {
+      "gold": "TRUE",
+      "pred": "FALSE"
+    },
+    "156096": {
+      "gold": "NOT ENOUGH INFO",
+      "pred": "FALSE"
+    },
+    "168999": {
+      "gold": "FALSE",
+      "pred": "TRUE"
+    },
+    "183930": {
+      "gold": "NOT ENOUGH INFO",
+      "pred": "NOT ENOUGH INFO"
+    },
+    "193874": {
+      "gold": "TRUE",
+      "pred": "TRUE"
+    },
+    "203003": {
+      "gold": "NOT ENOUGH INFO",
+      "pred": "NOT ENOUGH INFO"
+    },
+    "99974": {
+      "gold": "FALSE",
+      "pred": "TRUE"
+    },
+    "136725": {
+      "gold": "FALSE",
+      "pred": "FALSE"
+    },
+    "48684": {
+      "gold": "TRUE",
+      "pred": "NOT ENOUGH INFO"
+    },
+    "157641": {
+      "gold": "FALSE",
+      "pred": "FALSE"
+    },
+    "28325": {
+      "gold": "FALSE",
+      "pred": "FALSE"
+    },
+    "68341": {
+      "gold": "NOT ENOUGH INFO",
+      "pred": "NOT ENOUGH INFO"
+    },
+    "92444": {
+      "gold": "FALSE",
+      "pred": "NOT ENOUGH INFO"
+    },
+    "56669": {
+      "gold": "NOT ENOUGH INFO",
+      "pred": "TRUE"
+    },
+    "126140": {
+      "gold": "NOT ENOUGH INFO",
+      "pred": "TRUE"
+    },
+    "89777": {
+      "gold": "FALSE",
+      "pred": "FALSE"
+    },
+    "207676": {
+      "gold": "TRUE",
+      "pred": "NOT ENOUGH INFO"
+    },
+    "46911": {
+      "gold": "TRUE",
+      "pred": "TRUE"
+    },
+    "183140": {
+      "gold": "NOT ENOUGH INFO",
+      "pred": "NOT ENOUGH INFO"
+    },
+    "128336": {
+      "gold": "TRUE",
+      "pred": "TRUE"
+    },
+    "179332": {
+      "gold": "FALSE",
+      "pred": "FALSE"
+    },
+    "135519": {
+      "gold": "FALSE",
+      "pred": "FALSE"
+    },
+    "94829": {
+      "gold": "FALSE",
+      "pred": "TRUE"
+    },
+    "204441": {
+      "gold": "NOT ENOUGH INFO",
+      "pred": "TRUE"
+    },
+    "94310": {
+      "gold": "NOT ENOUGH INFO",
+      "pred": "FALSE"
+    },
+    "162213": {
+      "gold": "FALSE",
+      "pred": "FALSE"
+    },
+    "112185": {
+      "gold": "NOT ENOUGH INFO",
+      "pred": "NOT ENOUGH INFO"
+    },
+    "91705": {
+      "gold": "TRUE",
+      "pred": "TRUE"
+    },
+    "21564": {
+      "gold": "TRUE",
+      "pred": "TRUE"
+    },
+    "23430": {
+      "gold": "NOT ENOUGH INFO",
+      "pred": "NOT ENOUGH INFO"
+    },
+    "117380": {
+      "gold": "TRUE",
+      "pred": "TRUE"
+    },
+    "106809": {
+      "gold": "FALSE",
+      "pred": "FALSE"
+    },
+    "195922": {
+      "gold": "FALSE",
+      "pred": "FALSE"
+    },
+    "54257": {
+      "gold": "TRUE",
+      "pred": "TRUE"
+    },
+    "173930": {
+      "gold": "TRUE",
+      "pred": "NOT ENOUGH INFO"
+    },
+    "202314": {
+      "gold": "FALSE",
+      "pred": "FALSE"
+    },
+    "42840": {
+      "gold": "NOT ENOUGH INFO",
+      "pred": "TRUE"
+    },
+    "70784": {
+      "gold": "TRUE",
+      "pred": "NOT ENOUGH INFO"
+    },
+    "82492": {
+      "gold": "TRUE",
+      "pred": "TRUE"
+    },
+    "124730": {
+      "gold": "FALSE",
+      "pred": "FALSE"
+    },
+    "204430": {
+      "gold": "NOT ENOUGH INFO",
+      "pred": "FALSE"
+    },
+    "66692": {
+      "gold": "FALSE",
+      "pred": "FALSE"
+    },
+    "115940": {
+      "gold": "TRUE",
+      "pred": "TRUE"
+    },
+    "153147": {
+      "gold": "FALSE",
+      "pred": "TRUE"
+    },
+    "204325": {
+      "gold": "FALSE",
+      "pred": "FALSE"
+    },
+    "129632": {
+      "gold": "TRUE",
+      "pred": "TRUE"
+    },
+    "215230": {
+      "gold": "TRUE",
+      "pred": "TRUE"
+    },
+    "152559": {
+      "gold": "NOT ENOUGH INFO",
+      "pred": "TRUE"
+    },
+    "77250": {
+      "gold": "NOT ENOUGH INFO",
+      "pred": "TRUE"
+    },
+    "203009": {
+      "gold": "TRUE",
+      "pred": "TRUE"
+    },
+    "80909": {
+      "gold": "FALSE",
+      "pred": "FALSE"
+    },
+    "164883": {
+      "gold": "TRUE",
+      "pred": "TRUE"
+    },
+    "34942": {
+      "gold": "NOT ENOUGH INFO",
+      "pred": "NOT ENOUGH INFO"
+    },
+    "187557": {
+      "gold": "FALSE",
+      "pred": "FALSE"
+    },
+    "44950": {
+      "gold": "TRUE",
+      "pred": "TRUE"
+    },
+    "115283": {
+      "gold": "FALSE",
+      "pred": "TRUE"
+    },
+    "126678": {
+      "gold": "FALSE",
+      "pred": "FALSE"
+    },
+    "76097": {
+      "gold": "FALSE",
+      "pred": "FALSE"
+    },
+    "161796": {
+      "gold": "NOT ENOUGH INFO",
+      "pred": "NOT ENOUGH INFO"
+    },
+    "205289": {
+      "gold": "NOT ENOUGH INFO",
+      "pred": "FALSE"
+    },
+    "201751": {
+      "gold": "TRUE",
+      "pred": "TRUE"
+    },
+    "26820": {
+      "gold": "TRUE",
+      "pred": "TRUE"
+    },
+    "3338": {
+      "gold": "FALSE",
+      "pred": "FALSE"
+    },
+    "76562": {
+      "gold": "FALSE",
+      "pred": "TRUE"
+    },
+    "85256": {
+      "gold": "NOT ENOUGH INFO",
+      "pred": "TRUE"
+    },
+    "22692": {
+      "gold": "NOT ENOUGH INFO",
+      "pred": "FALSE"
+    },
+    "189867": {
+      "gold": "FALSE",
+      "pred": "FALSE"
+    },
+    "84332": {
+      "gold": "NOT ENOUGH INFO",
+      "pred": "NOT ENOUGH INFO"
+    },
+    "67876": {
+      "gold": "FALSE",
+      "pred": "FALSE"
+    },
+    "92374": {
+      "gold": "TRUE",
+      "pred": "TRUE"
+    },
+    "187318": {
+      "gold": "FALSE",
+      "pred": "FALSE"
+    },
+    "22741": {
+      "gold": "NOT ENOUGH INFO",
+      "pred": "TRUE"
+    },
+    "169018": {
+      "gold": "FALSE",
+      "pred": "FALSE"
+    },
+    "143044": {
+      "gold": "NOT ENOUGH INFO",
+      "pred": "NOT ENOUGH INFO"
+    },
+    "41980": {
+      "gold": "TRUE",
+      "pred": "TRUE"
+    },
+    "196971": {
+      "gold": "TRUE",
+      "pred": "TRUE"
+    },
+    "204548": {
+      "gold": "FALSE",
+      "pred": "FALSE"
+    },
+    "153146": {
+      "gold": "NOT ENOUGH INFO",
+      "pred": "TRUE"
+    },
+    "75535": {
+      "gold": "FALSE",
+      "pred": "FALSE"
+    },
+    "123702": {
+      "gold": "NOT ENOUGH INFO",
+      "pred": "NOT ENOUGH INFO"
+    },
+    "67011": {
+      "gold": "TRUE",
+      "pred": "TRUE"
+    },
+    "19766": {
+      "gold": "FALSE",
+      "pred": "TRUE"
+    },
+    "216401": {
+      "gold": "TRUE",
+      "pred": "TRUE"
+    },
+    "186588": {
+      "gold": "TRUE",
+      "pred": "TRUE"
+    },
+    "57433": {
+      "gold": "TRUE",
+      "pred": "TRUE"
+    },
+    "177868": {
+      "gold": "NOT ENOUGH INFO",
+      "pred": "FALSE"
+    },
+    "183504": {
+      "gold": "NOT ENOUGH INFO",
+      "pred": "NOT ENOUGH INFO"
+    },
+    "75466": {
+      "gold": "NOT ENOUGH INFO",
+      "pred": "TRUE"
+    },
+    "85274": {
+      "gold": "TRUE",
+      "pred": "TRUE"
+    },
+    "110681": {
+      "gold": "FALSE",
+      "pred": "FALSE"
+    },
+    "141936": {
+      "gold": "NOT ENOUGH INFO",
+      "pred": "NOT ENOUGH INFO"
+    },
+    "185415": {
+      "gold": "FALSE",
+      "pred": "TRUE"
+    },
+    "140664": {
+      "gold": "FALSE",
+      "pred": "FALSE"
+    },
+    "148776": {
+      "gold": "TRUE",
+      "pred": "TRUE"
+    },
+    "109898": {
+      "gold": "FALSE",
+      "pred": "FALSE"
+    }
   }
- }
 }
