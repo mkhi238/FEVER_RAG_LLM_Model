@@ -68,7 +68,7 @@ class FakeServer:
 @pytest.fixture
 def llm_from(monkeypatch):
   """llm_from(body) -> (the runnable build_llm() returns, wired to a FakeServer, the server)."""
-  from claimscan.instruct import model
+  from claimscan.instruct import chat_clients as model
   real = langchain_openai.ChatOpenAI
 
   def make(body):
@@ -77,7 +77,7 @@ def llm_from(monkeypatch):
     def chat(*a, **kw):
       kw.setdefault("max_retries", 0)
       return real(*a, http_client=httpx.Client(transport=httpx.MockTransport(server)), **kw)
-    # build_llm uses model.build_chat once the user writes it, else its inline ChatOpenAI fallback: patch both
+    # build_llm (no key) -> chat_clients.build_chat -> ChatOpenAI: patch it there
     monkeypatch.setattr(langchain_openai, "ChatOpenAI", chat)
     monkeypatch.setattr(model, "ChatOpenAI", chat, raising=False)
     import dataclasses

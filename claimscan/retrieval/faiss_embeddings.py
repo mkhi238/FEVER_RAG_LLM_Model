@@ -10,7 +10,6 @@ from sentence_transformers import SentenceTransformer
 
 from claimscan.config import config
 
-PARQUET = config.corpus
 OUTDIR = config.retriever_index_dir
 MODEL = config.retriever_model
 BATCH_SIZE = 2048
@@ -32,7 +31,8 @@ def main(index_name=None):
   outdir = Path(OUTDIR)
   outdir.mkdir(parents=True, exist_ok=True)
 
-  df = pd.read_parquet(PARQUET, columns=["id", "line", "text"])
+  from claimscan.data import fever_db
+  df = fever_db.sentences()
   df = df.sort_values(["id", "line"], kind="mergesort").reset_index(drop=True)
   if not {"id", "line", "text"}.issubset(df.columns):
     raise ValueError("Missing Columns")

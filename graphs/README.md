@@ -1,6 +1,6 @@
 # Graphs
 
-Generated 2026-11-25 00:25 by `python -m claimscan.graph.make_graphs` (or the `/graphs` skill). Don't edit by hand: the folder is rebuilt on every run.
+Generated 2026-11-25 13:17 by `python -m claimscan.graph.make_graphs` (or the `/graphs` skill). Don't edit by hand: the folder is rebuilt on every run.
 
 ## benchmark.png
 
@@ -8,7 +8,7 @@ Generated 2026-11-25 00:25 by `python -m claimscan.graph.make_graphs` (or the `/
 
 Retriever benchmark summary: retrieval metrics, end-to-end FEVER metrics and time per claim.
 
-Source: run `20261124-235456`
+Source: run `20261125-002513`
 
 ## retriever_recall_set.png
 
@@ -40,7 +40,7 @@ Source: benchmark cache, 300 claims (seed 0), 200 with gold evidence
 
 End-to-end predicted vs true label per retriever, row-normalised.
 
-Source: run `20261124-235456`
+Source: run `20261125-002513`
 
 ## verifier_training_curves.png
 

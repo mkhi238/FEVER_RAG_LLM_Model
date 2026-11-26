@@ -2,10 +2,10 @@
 ``hybrid_norm3``) end to end on the 300-claim benchmark sample.
 
 Not part of the unit tests: it needs the artifacts (cached hits, gold, corpus, verifier checkpoint), so it is
-deselected by default (``-m "not fever_suite"`` in pyproject) and run explicitly:
+skipped by a plain `pytest` (tests/conftest.py) and run by naming the file:
 
-    python -m pytest -m fever_suite tests/test_fever_suite.py                    # 300 claims (/fever-300)
-    python -m pytest -m fever_suite tests/test_fever_suite.py --fever-claims 10  # fast (/fever-10)
+    pytest tests/test_fever_suite.py --fever-claims 10   # quick (/fever, the default)
+    pytest tests/test_fever_suite.py                     # 300 claims (/fever 300)
 
 Compute: retrieval is NOT rerun. Both sizes read the FAISS and BM25 (no RM3) hits that the benchmark cached for the
 300-claim sample (<eval_dir>/cache/hits), fuse them exactly as the benchmark does, and rerun only the
@@ -14,10 +14,11 @@ same sample, so it reuses those hits too (a fresh 10-claim sample would need a f
 The corpus sentences those hits point at are cut from the 4 GB corpus once and cached in <eval_dir>/fever_suite.
 If the cached hits are missing, they are rebuilt once with the benchmark's own _retrieve stage (~15 min).
 
-Checked against tests/data/fever_suite_hybrid_norm3_baseline.json (benchmark run 20261124-220309, hybrid_norm3):
-  - per-claim predicted labels: at most MAX_FLIPS differ
-  - 300 claims: retrieval metrics exactly, and the FEVER metric within MAX_FLIPS claims
-Results are written to <eval_dir>/fever_suite/latest_n<N>.json (read by the /fever-300 and /fever-10 skills).
+One test, test_suite_matches_baseline, checks against tests/data/fever_suite_hybrid_norm3_baseline.json
+(benchmark run 20261124-220309, hybrid_norm3):
+  - any N: per-claim predicted labels, at most MAX_FLIPS differ
+  - 300 claims: also label accuracy / FEVER score within MAX_FLIPS claims, and retrieval metrics exactly
+Results are written to <eval_dir>/fever_suite/latest_n<N>.json (read by the /fever skill).
 """
 from __future__ import annotations
 
@@ -48,7 +49,7 @@ def balanced_slice(claims, n: int):
   return claims.iloc[keep].reset_index(drop=True)
 
 
-def _services_factory(cfg, B, all_fused: dict, base: dict, out_dir: Path):
+def _services_factory(cfg, B, all_fused: dict, base: dict, out_dir: Path, verifier: str):
   """Verifier on 2 CPU threads + the corpus rows of every page in the 300 claims' top-k hybrid hits.
 
   The subset is cut from the 4 GB corpus once (the slow part, minutes on D:) and cached as a small parquet,
@@ -69,7 +70,7 @@ def _services_factory(cfg, B, all_fused: dict, base: dict, out_dir: Path):
     corpus = B.load_corpus_subset(pages, cfg)
     out_dir.mkdir(parents=True, exist_ok=True)
     corpus.reset_index().to_parquet(path)
-  model = load_verifier(cfg)
+  model = load_verifier(cfg, verifier)
   return lambda retr: Services(model=model, retriever=retr, corpus_df=corpus)
 
 
@@ -84,7 +85,7 @@ def suite(request):
   base = json.loads(BASELINE_FILE.read_text())
   if not 1 <= n <= len(base["predictions"]):
     pytest.fail(f"--fever-claims must be 1..{len(base['predictions'])}, got {n}")
-  for p in (cfg.verifier_output_dir, cfg.corpus):
+  for p in (cfg.verifier_output_dir, cfg.sentence_store):
     if not Path(p).exists():
       pytest.skip(f"artifact missing: {p}")
 
@@ -116,41 +117,150 @@ def suite(request):
   t = time.perf_counter()
   retrieval = B.retrieval_metrics(fused, gold)
   out_dir = Path(cfg.eval_dir) / "fever_suite"
-  services_factory = _services_factory(cfg, B, all_fused, base, out_dir)
-  e2e = B.e2e_stage(claims, {RETRIEVER: fused}, out_dir / f"e2e_n{n}.json", k=base["k"],
+  verifier = request.config.getoption("--verifier") or cfg.verifier_inference_model
+  tag = "" if verifier == base["verifier"] else "_" + verifier.replace("/", "__")   # other verifiers: own files
+  services_factory = _services_factory(cfg, B, all_fused, base, out_dir, verifier)
+  e2e = B.e2e_stage(claims, {RETRIEVER: fused}, out_dir / f"e2e_n{n}{tag}.json", k=base["k"],
                     conf_threshold=base["conf_threshold"], threads=2, services_factory=services_factory,
                     gold=gold, cfg=cfg)[RETRIEVER]
-  preds = pd.read_parquet(out_dir / f"e2e_n{n}.predictions.parquet")
+  preds = pd.read_parquet(out_dir / f"e2e_n{n}{tag}.predictions.parquet")
   pred = {int(r.id): r.pred for r in preds.itertuples()}
   flips = [{"id": i, "gold": base["predictions"][str(i)]["gold"], "baseline": base["predictions"][str(i)]["pred"],
             "now": pred[i]} for i in ids if pred[i] != base["predictions"][str(i)]["pred"]]
 
   result = {"timestamp": datetime.now().isoformat(timespec="seconds"), "n_claims": n, "retriever": RETRIEVER,
+            "verifier": verifier, "baseline_verifier": base["verifier"],
             "labels": claims["label_text"].value_counts().to_dict(), "retrieval": retrieval, "e2e": e2e,
             "flips_vs_baseline": flips, "baseline": {"retrieval": base["retrieval"], "e2e": base["e2e"]},
             "wall_clock_s": round(time.perf_counter() - t, 1)}
   out_dir.mkdir(parents=True, exist_ok=True)
-  (out_dir / f"latest_n{n}.json").write_text(json.dumps(result, indent=2))
+  (out_dir / f"latest_n{n}{tag}.json").write_text(json.dumps(result, indent=2))
   return result, base
 
 
-def test_predictions_match_baseline(suite):
-  result, _ = suite
-  assert len(result["flips_vs_baseline"]) <= MAX_FLIPS, result["flips_vs_baseline"]
+def _skip_if_other_verifier(result):
+  if result["verifier"] != result["baseline_verifier"]:
+    pytest.skip(f"--verifier {result['verifier']}: the baseline is for {result['baseline_verifier']}; "
+                "see latest_n<N>_<model>.json")
 
 
-def test_fever_metric_matches_baseline(suite):
+def test_suite_matches_baseline(suite):
+  """Per-claim predictions (any N), and at the full 300 claims also the numbers: label accuracy and FEVER score
+  (within MAX_FLIPS claims) and retrieval metrics (exactly). The numbers are in latest_n<N>.json either way."""
   result, base = suite
-  if result["n_claims"] != len(base["predictions"]):
-    pytest.skip("baseline FEVER metric is for the full 300-claim sample")
-  tol = MAX_FLIPS / result["n_claims"] + 1e-9
-  for m in ("label_accuracy", "fever_score"):
-    assert result["e2e"][m] == pytest.approx(base["e2e"][m], abs=tol), m
+  _skip_if_other_verifier(result)
+  problems = []
+  if len(result["flips_vs_baseline"]) > MAX_FLIPS:
+    problems.append(f"{len(result['flips_vs_baseline'])} claims changed prediction: {result['flips_vs_baseline']}")
+  if result["n_claims"] == len(base["predictions"]):
+    tol = MAX_FLIPS / result["n_claims"] + 1e-9
+    for m in ("label_accuracy", "fever_score"):
+      if abs(result["e2e"][m] - base["e2e"][m]) > tol:
+        problems.append(f"{m} {result['e2e'][m]:.3f} vs baseline {base['e2e'][m]:.3f}")
+    for m, v in base["retrieval"].items():
+      if abs(result["retrieval"][m] - v) > 1e-9:
+        problems.append(f"retrieval {m} {result['retrieval'][m]:.4f} vs baseline {v:.4f}")
+  assert not problems, "\n".join(problems)
 
 
-def test_retrieval_matches_baseline(suite):
-  result, base = suite
-  if result["n_claims"] != len(base["predictions"]):
-    pytest.skip("baseline retrieval metrics are for the full 300-claim sample")
-  for m, v in base["retrieval"].items():
-    assert result["retrieval"][m] == pytest.approx(v, abs=1e-9), m
+# --- Verifier with gold evidence --------------------------------------------------------------------------------
+# Measures the DeBERTa verifier on its own: the suite's TRUE/FALSE claims (NEI claims have no gold evidence) get the
+# gold sentences (first FEVER evidence set, at most 3) instead of retrieved ones. Compared with the suite's own
+# accuracy on the same claims, read from the baseline file. A measurement, not an accuracy check. It is NOT part of
+# /fever (tests/conftest.py deselects it): run it by naming it with -k or -m gold_evidence:
+#
+#     pytest tests/test_fever_suite.py -k gold_evidence -s
+#
+#     pytest tests/test_fever_suite.py -k gold_evidence --verifier MoritzLaurer/DeBERTa-v3-base-mnli-fever-anli
+#     pytest tests/test_fever_suite.py -k gold_evidence --verifier <dir>/trained_model/model.pt   # another checkpoint
+#     add --gold-split train for 200 TRUE/FALSE train claims instead of the suite's (a leakage check)
+#
+# Writes <eval_dir>/fever_suite/latest_oracle.json (the config's verifier) or latest_oracle_<model>.json (another one).
+#     --verifier ours = the old trained checkpoint (57% with gold evidence).
+
+def _load_checkpoint(path: str):
+  """Our FEVERVerifier from another checkpoint (e.g. a retrained verifier/deberta_v2/trained_model/model.pt)."""
+  import torch
+  from claimscan.verifier.deberta_verifier import FEVERVerifier
+  model = FEVERVerifier()
+  model.load_state_dict(torch.load(path, map_location="cpu"))
+  return model.eval()
+
+
+@pytest.fixture(scope="module")
+def gold_evidence_run(request):
+  pd = pytest.importorskip("pandas")
+  import torch
+  from claimscan.config import config as cfg
+  from claimscan.eval import benchmark as B
+  from claimscan.eval.gold import load_claims, load_gold_sets
+  from claimscan.evidence.select import _lookup_text, index_corpus
+  from claimscan.pipeline import load_verifier, verify
+
+  for p in (cfg.verifier_checkpoint, cfg.sentence_store):
+    if not Path(p).exists():
+      pytest.skip(f"artifact missing: {p}")
+  base = json.loads(BASELINE_FILE.read_text())
+  claims_file = Path(cfg.eval_dir) / "cache" / base["claims_file"]
+  if not claims_file.exists():
+    pytest.skip(f"claim sample missing: {claims_file} (run the full suite once)")
+  sample = pd.read_parquet(claims_file)
+  assert B.claims_key(sample["id"]) == base["claims_key"], "claim sample differs from the baseline's"
+
+  split = request.config.getoption("--gold-split")
+  if split == "validation":
+    gold = load_gold_sets(sample["id"])
+    claims = sample[sample["id"].astype(int).isin(gold.keys())]
+  else:  # 200 TRUE/FALSE train claims (seen by FEVER-NLI models): 100 per label, seed 0, with gold evidence
+    pool = load_claims("train")
+    pool = pool[pool["label_text"] != "NOT ENOUGH INFO"].sample(frac=1, random_state=0)
+    gold = load_gold_sets(pool["id"])
+    pool = pool[pool["id"].isin(gold.keys())]
+    claims = pd.concat([g.head(100) for _, g in pool.groupby("label_text")])
+    gold = {int(i): gold[int(i)] for i in claims["id"]}
+  # gold sentences cut from the 4 GB corpus once (minutes on D:) and cached, like the suite's corpus subset
+  out_dir = Path(cfg.eval_dir) / "fever_suite"
+  path = out_dir / (f"corpus_{base['claims_key']}_gold.parquet" if split == "validation" else "corpus_train200_gold.parquet")
+  if path.exists():
+    corpus = index_corpus(pd.read_parquet(path))
+  else:
+    corpus = B.load_corpus_subset({d.rsplit("#", 1)[0] for sets in gold.values() for d in sets[0][:3]}, cfg)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    corpus.reset_index().to_parquet(path)
+  torch.set_num_threads(2)
+  name = request.config.getoption("--verifier") or cfg.verifier_inference_model
+  model = _load_checkpoint(name) if name.endswith(".pt") else load_verifier(cfg, name)
+  predict = lambda claim, evidence: verify(model, claim, evidence)[0]
+
+  t = time.perf_counter()
+  rows = []
+  for c in claims.itertuples():
+    cid = int(c.id)
+    docids = gold[cid][0][:3]
+    hits = [{"id": d.rsplit("#", 1)[0], "line": int(d.rsplit("#", 1)[1])} for d in docids]
+    evidence = [s for s in (_lookup_text(corpus, h["id"], h["line"]) for h in hits) if s is not None]
+    pred = predict(c.claim, evidence) if evidence else None
+    rows.append({"id": cid, "gold": c.label_text, "pred_gold_evidence": pred,
+                 "pred_suite": base["predictions"][str(cid)]["pred"] if split == "validation" else None, "evidence": docids,
+                 "sentences_found": len(evidence)})
+
+  scored = [r for r in rows if r["pred_gold_evidence"] is not None]
+  acc = lambda key: round(sum(r[key] == r["gold"] for r in scored) / len(scored), 4)
+  result = {"timestamp": datetime.now().isoformat(timespec="seconds"), "verifier": name, "split": split,
+            "claims": len(rows), "claims_scored": len(scored),
+            "accuracy_gold_evidence": acc("pred_gold_evidence"),
+            "accuracy_suite_retrieved_evidence": acc("pred_suite") if split == "validation" else None,
+            "wall_clock_s": round(time.perf_counter() - t, 1), "per_claim": rows}
+  tag = Path(name).parent.parent.name if name.endswith(".pt") else name.replace("/", "__")
+  out_name = "latest_oracle.json" if name == cfg.verifier_inference_model else f"latest_oracle_{tag}.json"
+  if split != "validation":
+    out_name = out_name.replace(".json", f"_{split}.json")
+  (out_dir / out_name).write_text(json.dumps(result, indent=2))
+  print(f"\nverifier on {len(scored)} TRUE/FALSE {split} claims: gold evidence {result['accuracy_gold_evidence']:.1%}")
+  return result
+
+
+@pytest.mark.gold_evidence
+def test_verifier_with_gold_evidence(gold_evidence_run):
+  r = gold_evidence_run
+  assert r["claims_scored"] > 0.9 * r["claims"], f"gold sentences missing from the corpus for many claims: {r}"

@@ -14,7 +14,7 @@ import torch
 
 from claimscan.config import ClaimScanConfig, config
 from claimscan.evidence.select import _lookup_text, get_evidence
-from claimscan.verifier.model import FEVERVerifier
+from claimscan.verifier.deberta_verifier import FEVERVerifier
 
 LABEL_MAP = {0: "TRUE", 1: "FALSE", 2: "NOT ENOUGH INFO"}
 
@@ -26,7 +26,12 @@ class Services:
   corpus_df: "pd.DataFrame | SentenceStore"   # SentenceStore: per-request lookup, used by the API
 
 
-def load_verifier(cfg: ClaimScanConfig = config) -> FEVERVerifier:
+def load_verifier(cfg: ClaimScanConfig = config, name: str | None = None) -> FEVERVerifier:
+  """``name`` (default cfg.verifier_inference_model): "ours" = the trained checkpoint, else a HuggingFace NLI model."""
+  name = name or cfg.verifier_inference_model
+  if name != "ours":
+    from claimscan.verifier.hf_nli import HFNLIVerifier
+    return HFNLIVerifier(name, cfg.max_length).eval()
   model = FEVERVerifier()
   # map_location: checkpoint was saved on GPU; inference here runs on CPU as before
   model.load_state_dict(torch.load(cfg.verifier_checkpoint, map_location="cpu"))
@@ -61,8 +66,8 @@ def load_retriever(cfg: ClaimScanConfig = config, kind: str | None = None):
 def load_services(cfg: ClaimScanConfig = config) -> Services:
   model = load_verifier(cfg)
   retriever = load_retriever(cfg)
-  corpus_df = pd.read_parquet(cfg.corpus)
-  return Services(model=model, retriever=retriever, corpus_df=corpus_df)
+  from claimscan.evidence.store import SentenceStore
+  return Services(model=model, retriever=retriever, corpus_df=SentenceStore(cfg.sentence_store))
 
 
 def verify(model, claim, evidence):

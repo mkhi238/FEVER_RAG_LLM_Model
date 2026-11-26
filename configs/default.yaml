@@ -12,10 +12,6 @@ hf_home: /mnt/d/huggingface_cache
 # Relative paths below are resolved against artifacts_root.
 paths:
   data_processed: data/processed
-  claims_file: data/processed/fever_claims_parquet
-  gold_file: data/processed/fever_gold.json
-  corpus: data/processed/fever_corpus_parquet
-  evidence: data/processed/fever_evidence_parquet
   retriever_index_dir: dense/faiss_bge_small_en_v1_5
   verifier_output_dir: verifier/deberta_v1
   verifier_training_data: verifier/deberta_v1/training_data.json/training_data.json
@@ -76,13 +72,12 @@ rerank:
 # benchmark never uses it. Fails open: if the server is down the verifier's verdict is returned.
 # Env: CLAIMSCAN_AGGREGATOR_ENABLED (1/0), CLAIMSCAN_AGGREGATOR_URL, CLAIMSCAN_AGGREGATOR_MODEL,
 #      CLAIMSCAN_AGGREGATOR_TIMEOUT, CLAIMSCAN_AGGREGATOR_API_KEY_ENV
-# Hosted API instead of llama-server:
-#   base_url: https://api.openai.com/v1
-#   model: gpt-5-nano
-#   api_key_env: OPENAI_API_KEY        # the key itself stays in that env var, never in this file
+# Local llama-server: its port comes from the aggregator role in llamacpp/roles.yaml (CLAIMSCAN_AGGREGATOR_URL overrides it).
+# Together AI instead of llama-server (setting api_key_env switches to ChatTogether):
+#   model: meta-llama/Llama-3.3-70B-Instruct-Turbo   # any Together model id
+#   api_key_env: TOGETHER_API_KEY      # the key itself stays in that env var, never in this file
 aggregator:
   enabled: false
-  base_url: http://127.0.0.1:8083/v1   # OpenAI-compatible llama-server (aggregator role in llamacpp/roles.yaml)
   model: gemma                         # llama-server serves one model and ignores the name; hosted APIs need a real one
   api_key_env: ""                      # NAME of the env var holding the API key; "" = local llama-server (no key)
   timeout: 30                          # seconds per request; no retries
@@ -108,6 +103,9 @@ default_dense_index: bge_small
 
 verifier:
   model: microsoft/deberta-v3-base
+  # Verifier the pipeline / API / benchmark use: "ours" (verifier_output_dir/trained_model/model.pt)
+  # or a HuggingFace NLI model, e.g. MoritzLaurer/DeBERTa-v3-base-mnli-fever-anli (claimscan/verifier/hf_nli.py)
+  inference_model: MoritzLaurer/DeBERTa-v3-base-mnli-fever-anli
   batch_size: 8
   learning_rate: 2.0e-5
   num_epochs: 3

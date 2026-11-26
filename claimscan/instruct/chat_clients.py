@@ -25,5 +25,30 @@ def build_chat(role: str, base_url: str | None = None, timeout: float = 30.0) ->
   """ChatOpenAI for `role` in roles.yaml (follows `shares:`), temperature 0, no retries (the caller fails open).
 
   base_url, if given, wins over roles.yaml.
+  
+  roles = {
+      "aggregator": {
+          "port": 8083,
+          "model": "gemma"
+      },
+      "front_facer": {
+          "shares": "aggregator"
+      },
+      "decomposer": {
+          "shares": "aggregator"
+      }
+  }
   """
-  raise NotImplementedError  # TODO(user)
+  with open (ROLES_FILE, encoding='utf-8') as f:
+    roles = yaml.safe_load(f)["roles"]
+
+  config = roles[role] #role = "front_facer" or "decomposer" or "aggregator"
+  shares = config.get("shares")
+  if shares:
+    config = roles[shares]
+  model = config["model"]
+  url = base_url or f"http://127.0.0.1:{config['port']}/v1"
+  llm = ChatOpenAI(model=model, base_url=url, api_key="not-needed",
+                    temperature=0, max_retries=0, timeout=timeout)
+  return llm
+  

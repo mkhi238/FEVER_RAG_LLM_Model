@@ -9,7 +9,8 @@ pytest.importorskip("evaluate")
 
 from claimscan.eval import fever_eval  # noqa: E402
 from claimscan.eval.fever_eval import load_fever_metric, to_prediction, to_reference  # noqa: E402
-from claimscan.eval.gold import fix_line, load_gold_pairs, load_gold_sets  # noqa: E402
+from claimscan.data import fever_db  # noqa: E402
+from claimscan.eval.gold import fix_line, load_claims, load_gold_pairs, load_gold_sets  # noqa: E402
 
 # The upstream unittest suite, run unchanged against the vendored copy.
 sys.path.insert(0, str(fever_eval.METRIC_DIR))
@@ -57,20 +58,21 @@ def test_fix_line_maps_minus_one_to_zero():
 
 
 def test_gold_sets_group_by_annotation_and_fix_line0(tmp_path):
-  ev = pd.DataFrame({
-    "id":                     [1, 1, 1, 2],
-    "evidence_annotation_id": [10, 10, 11, 20],
-    "evidence_wiki_url":      ["Nikolaj_Coster-Waldau", "Fox_Broadcasting_Company", "Nikolaj_Coster-Waldau", None],
-    "evidence_sentence_id":   [7, -1, 7, -1],
-  })
-  ev.to_parquet(tmp_path / "ev.parquet")
-  sets = load_gold_sets(path=tmp_path / "ev.parquet")
+  claims = pd.DataFrame({"id": [1, 2], "split": "validation", "claim": ["a", "b"], "label": ["TRUE", "NOT ENOUGH INFO"]})
+  ev = pd.DataFrame({"claim_id": [1, 1, 1], "set_id": [10, 10, 11],
+                     "page": ["Nikolaj_Coster-Waldau", "Fox_Broadcasting_Company", "Nikolaj_Coster-Waldau"],
+                     "line": [7, -1, 7]})
+  fever_db.write_claims_and_evidence(claims, ev, tmp_path / "f.sqlite")
+  sets = load_gold_sets(db=tmp_path / "f.sqlite")
   assert sets == {1: [["Fox_Broadcasting_Company#0", "Nikolaj_Coster-Waldau#7"], ["Nikolaj_Coster-Waldau#7"]]}
+  assert list(load_claims("val", db=tmp_path / "f.sqlite")["id"]) == [1, 2]
 
 
 def test_gold_pairs_fix_line0(tmp_path):
-  (tmp_path / "g.json").write_text('{"5": [["Tokyo", -1], ["Tokyo", 3]]}')
-  assert load_gold_pairs(tmp_path / "g.json") == {5: [("Tokyo", 0), ("Tokyo", 3)]}
+  claims = pd.DataFrame({"id": [5], "split": "train", "claim": ["t"], "label": ["TRUE"]})
+  ev = pd.DataFrame({"claim_id": [5, 5, 5], "set_id": [1, 1, 2], "page": ["Tokyo"] * 3, "line": [-1, 3, 0]})
+  fever_db.write_claims_and_evidence(claims, ev, tmp_path / "f.sqlite")
+  assert load_gold_pairs(db=tmp_path / "f.sqlite") == {5: [("Tokyo", 0), ("Tokyo", 3)]}
 
 
 def test_evaluate_pipeline_with_stub_services(monkeypatch):

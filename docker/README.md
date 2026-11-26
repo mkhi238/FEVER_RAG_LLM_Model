@@ -12,7 +12,7 @@ only for faiss-only images (they must run with `CLAIMSCAN_RETRIEVER=faiss`).
 | mount | host path (default) | what's used |
 |---|---|---|
 | `/artifacts` (ro) | `/mnt/d/crisis-claim-analysis/artifacts` | FAISS index `dense/faiss_bge_small_en_v1_5/` (26 GB, memory-mapped), BM25 Lucene index `sparse/bm25_sentences/index/` (4.3 GB), `data/processed/fever_sentences.sqlite`, verifier `model.pt` |
-| `/hf` (ro) | `/mnt/d/huggingface_cache` | `BAAI/bge-small-en-v1.5`, `microsoft/deberta-v3-base` (offline; nothing is downloaded) |
+| `/hf` (ro) | `/mnt/d/huggingface_cache` | `BAAI/bge-small-en-v1.5`, `microsoft/deberta-v3-base`, `MoritzLaurer/DeBERTa-v3-base-mnli-fever-anli` (the default verifier; offline, nothing is downloaded) |
 | `/models` (ro, `llama` only) | `/mnt/e/llm/models` | the Gemma GGUF for the rear aggregator |
 
 Files: `Dockerfile` and `docker-compose.yml` (repo root), `docker/constraints.txt` (exact versions for the
@@ -24,11 +24,11 @@ image; `requirements.txt` stays the list of what the code needs; `WITH_BM25=0` d
 2. **Keep Docker off C:** Docker Desktop → Settings → Resources → Advanced → *Disk image location* → a
    folder on D: (e.g. `D:\DockerDesktop`). The default is under `%LOCALAPPDATA%` on C:, and the image plus
    build cache is a few GB. Check with `docker info --format '{{.DockerRootDir}}'` and Docker Desktop's setting.
-3. **Sentence store** (replaces loading the 4 GB corpus into RAM):
+3. **FEVER SQLite** `<artifacts>/data/processed/fever_sentences.sqlite` (sentences, claims, evidence; replaces
+   loading the 4 GB corpus into RAM). How to build it: `claimscan/data/fever_db.py`. Check it:
    ```bash
    source .venv/bin/activate && source scripts/env.sh
-   python -m claimscan.evidence.store build    # ~20-40 min, writes <artifacts>/data/processed/fever_sentences.sqlite
-   python -m claimscan.evidence.store check
+   python -m claimscan.evidence.store
    ```
 
 ## Run with compose (recommended)
@@ -115,7 +115,7 @@ so the benchmark numbers in `graphs/` describe this endpoint. Interactive docs: 
 
 ## Resources
 
-- **RAM:** ~5.5 GB with the default `hybrid` (5.4 GB RSS measured 2026-11-25) (~2 GB for the memory-mapped FAISS index + DeBERTa + bge-small,
+- **RAM:** ~4.5 GB with the default `hybrid` (~2 GB for the memory-mapped FAISS index + DeBERTa + bge-small,
   plus ~2.5 GB for BM25's JVM); ~2 GB with `faiss`. Add ~3 GB for `llama` with a 4B Q4_K_M model at ctx 8192. Docker Desktop's WSL VM
   must be allowed that much (the machine has 15 GB).
 - **First request is slow** (~25 s for FAISS; cold BM25 queries took 6-11 s with RM3, less without) while the

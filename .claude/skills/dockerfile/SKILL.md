@@ -33,9 +33,8 @@ ls -d /mnt/d/huggingface_cache/hub/models--BAAI--bge-small-en-v1.5 /mnt/d/huggin
 
 - **Docker disk on C:** stop. The repo's hard rule is nothing on C:. Docker Desktop → Settings → Resources →
   Advanced → *Disk image location* → `E:\DockerDesktop`.
-- **No sentence store:** `source .venv/bin/activate && source scripts/env.sh && nice -n 19 python -m claimscan.evidence.store build`
-  (~20-40 min, on D:), then `python -m claimscan.evidence.store check`. The image can be built without it, but
-  the API can't start.
+- **No sentence store:** build `fever_sentences.sqlite` as described in `claimscan/data/fever_db.py` (on D:),
+  then check it with `python -m claimscan.evidence.store`. The image can be built without it, but the API can't start.
 - **Uncommitted changes under `claimscan/` or `configs/`:** they would be baked into the image. Build from a clean
   ship/main checkout instead.
 
@@ -45,7 +44,7 @@ ls -d /mnt/d/huggingface_cache/hub/models--BAAI--bge-small-en-v1.5 /mnt/d/huggin
 time docker compose build api                        # = docker build -t claimscan-api . (WITH_BM25=1: Java 21 + pyserini)
 WITH_BM25=0 docker compose build api                 # faiss-only image; must run with CLAIMSCAN_RETRIEVER=faiss
 docker image ls claimscan-api --format '{{.Repository}}:{{.Tag}} {{.Size}}'
-docker history --no-trunc claimscan-api | grep -iE "key|secret|token|password" && echo "STOP: secret in a layer"
+docker history --no-trunc claimscan-api | grep -iE "key|secret|token|password" | grep -v "GPG_KEY=" && echo "STOP: secret in a layer"   # GPG_KEY = python base image's public signing key, not a secret
 ```
 
 Rebuild after changing `requirements.txt`, `docker/constraints.txt`, the `Dockerfile` or any shipped code.
@@ -55,14 +54,14 @@ Deps are installed before the code is copied, so code-only rebuilds reuse the pi
 
 ```bash
 docker compose up -d api                             # hybrid retriever, rear aggregator OFF
-.claude/skills/dockerfile/docker-health.sh           # waits for healthy (<=30 min; cold start measured 19 min), 3 smoke claims, uid, ro mount, RAM
+.claude/skills/dockerfile/docker-health.sh           # waits for healthy (<=30 min; cold start from D: measured ~19 min), 3 smoke claims, uid, ro mount, RAM
 docker compose down
 ```
 
-`docker-health.sh` waits on the container's HEALTHCHECK (`/health` → `models_loaded`, start period 1500 s; a cold start reading the indexes from D: took 19 min, warm requests ~3-9 s). It
+`docker-health.sh` waits on the container's HEALTHCHECK (`/health` → `models_loaded`, start period 1500 s). Run it in the background and wait for the notification. It
 falls back to probing `/health` directly, then POSTs a likely-TRUE, a likely-FALSE and a likely-NEI claim. It
 checks the HTTP status and response shape, not the verdict: the verifier is imperfect, and the benchmark covers
-accuracy (`/fever-300`).
+accuracy (`/fever-full-test 300`).
 
 ## Quick reference
 
@@ -97,13 +96,14 @@ accuracy (`/fever-300`).
 | Symptom | Fix |
 |---|---|
 | `error during connect ... dockerDesktopLinuxEngine` | Docker Desktop isn't running. Start it. |
+| `500 Internal Server Error ... dockerDesktopLinuxEngine`, or `docker` missing in WSL while Docker Desktop runs | The engine is stuck (seen 2026-11-25: a WSL-integration error dialog left open, the `docker-desktop` distro stopped). Restart it: `powershell.exe -NoProfile -Command "Stop-Process -Name 'Docker Desktop','com.docker.backend','com.docker.build' -Force; Start-Sleep 5; wsl.exe --terminate docker-desktop; Start-Process 'C:\Program Files\Docker\Docker\Docker Desktop.exe'"`, then poll `docker info` (~1 min). Never `wsl --shutdown` from inside WSL. |
 | `docker: command not found` in WSL | Docker Desktop → Settings → Resources → WSL Integration → enable Ubuntu. Don't use `docker.exe` from WSL: it can't read `/mnt/d` bind mounts. |
-| Container exits or is OOM-killed while loading | The WSL VM needs ~5.5 GB for `hybrid` (measured 5.4 GB RSS) (BM25's JVM ~2.5 GB). Raise the VM memory, or run `CLAIMSCAN_RETRIEVER=faiss`. |
+| Container exits or is OOM-killed while loading | The WSL VM needs ~4.5 GB for `hybrid` (BM25's JVM ~2.5 GB). Raise the VM memory, or run `CLAIMSCAN_RETRIEVER=faiss`. |
 | `fever_sentences.sqlite missing` in the logs | Build the sentence store (pre-flight). |
 | `OSError ... offline mode` / model not found | The HF cache mount is missing a model. Check `HF_CACHE_HOST` has bge-small-en-v1.5 and deberta-v3-base under `hub/`. |
 | `JavaException` / pyserini import error | The image was built with `WITH_BM25=0` but is running hybrid/bm25. Rebuild with the default, or run faiss. |
 | First request takes 10-30 s | Normal: the FAISS/BM25 indexes are paging in from D:. Later requests take a few seconds. |
-| Port 8000 in use | `API_PORT=8001 docker compose up -d api` (and `docker-health.sh 1800 8001`) |
+| Port 8000 in use | `API_PORT=8001 docker compose up -d api` (and `docker-health.sh 420 8001`) |
 | Unhealthy but `/health` responds | `models_loaded` is false: read `docker compose logs api` for the load error. |
 
 ## Report

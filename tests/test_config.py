@@ -6,7 +6,7 @@ from claimscan.config import config, load_config, validate_config
 
 
 def test_paths_are_absolute_and_linux():
-  for name in ["claims_file", "gold_file", "corpus", "evidence", "retriever_index_dir", "verifier_output_dir"]:
+  for name in ["sentence_store", "retriever_index_dir", "verifier_output_dir"]:
     p = getattr(config, name)
     assert isinstance(p, Path) and p.is_absolute(), name
     assert "\\" not in str(p), f"{name} still has a Windows path: {p}"
@@ -15,7 +15,7 @@ def test_paths_are_absolute_and_linux():
 def test_env_override(monkeypatch, tmp_path):
   monkeypatch.setenv("CLAIMSCAN_ARTIFACTS", str(tmp_path))
   cfg = load_config()
-  assert cfg.corpus == tmp_path / "data/processed/fever_corpus_parquet"
+  assert cfg.sentence_store == tmp_path / "data/processed/fever_sentences.sqlite"
   assert not (tmp_path / "verifier").exists(), "loading config must not create directories"
 
 

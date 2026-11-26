@@ -1,8 +1,10 @@
 """Verifier data prep (line-0 fix, lookups) and the train/val split. Toy data only: no artifacts, no GPU."""
 import pandas as pd
 
+from claimscan.data import fever_db
+from claimscan.eval.gold import load_gold_pairs
 from claimscan.evidence.select import index_corpus
-from claimscan.verifier.prepare import create_training_data, get_negative_text, group_gold_pairs
+from claimscan.verifier.prepare import create_training_data, get_negative_text
 from claimscan.verifier.train import split_examples
 
 CORPUS = index_corpus(pd.DataFrame({
@@ -11,12 +13,21 @@ CORPUS = index_corpus(pd.DataFrame({
   "text": ["Obama was born in Hawaii.", "Obama went to Harvard.", "Paris is in France.", "Paris has museums."],
 }))
 
+# The FEVER SQLite DB layout (claimscan/data/fever_db.py). NEI claim 3 has no evidence rows.
+CLAIMS = pd.DataFrame({"id": [1, 2, 3], "split": "train", "claim": ["a", "b", "c"],
+                       "label": ["TRUE", "FALSE", "NOT ENOUGH INFO"]})
 EVIDENCE = pd.DataFrame({
-  "id": [1, 1, 2, 3],
-  "evidence_annotation_id": [10, 11, 20, 30],
-  "evidence_wiki_url": ["Barack Obama", "Barack_Obama", "Paris", None],
-  "evidence_sentence_id": [-1, -1, 1, -1],  # -1 means line 0 (HF loader quirk)
+  "claim_id": [1, 1, 2],
+  "set_id": [10, 11, 20],
+  "page": ["Barack Obama", "Barack_Obama", "Paris"],
+  "line": [-1, -1, 1],  # -1 means line 0 (HF loader quirk)
 })
+
+
+def gold_pairs(tmp_path):
+  db = tmp_path / "fever.sqlite"
+  fever_db.write_claims_and_evidence(CLAIMS, EVIDENCE, db)
+  return load_gold_pairs(db=db)
 
 
 class FakeRetriever:
@@ -27,8 +38,8 @@ class FakeRetriever:
     return self.hits[:k]
 
 
-def test_gold_pairs_fix_line0_and_dedupe():
-  gold = group_gold_pairs(EVIDENCE)
+def test_gold_pairs_fix_line0_and_dedupe(tmp_path):
+  gold = gold_pairs(tmp_path)
   assert gold == {1: [("Barack_Obama", 0)], 2: [("Paris", 1)]}  # NEI claim 3 skipped, duplicate set merged
 
 
@@ -38,11 +49,11 @@ def test_gold_line0_not_used_as_negative():
   assert negs == ["Obama went to Harvard."]
 
 
-def test_create_training_data_finds_line0_evidence():
+def test_create_training_data_finds_line0_evidence(tmp_path):
   claims = pd.DataFrame({"id": [1, 2], "claim": ["Obama was born in Hawaii", "Paris has no museums"],
                          "label_text": ["TRUE", "FALSE"]})
   retriever = FakeRetriever([{"id": "Paris", "line": 0}])
-  ex = create_training_data(claims, group_gold_pairs(EVIDENCE), CORPUS, retriever, per_class=5)
+  ex = create_training_data(claims, gold_pairs(tmp_path), CORPUS, retriever, per_class=5)
   by_label = {}
   for e in ex:
     by_label.setdefault(e["label"], []).append(e)

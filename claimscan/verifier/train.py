@@ -13,7 +13,7 @@ from tqdm import tqdm
 from pathlib import Path
 import matplotlib.pyplot as plt
 from claimscan.config import config
-from claimscan.verifier.model import FEVERVerifier
+from claimscan.verifier.deberta_verifier import FEVERVerifier
 
 class FEVERDatasetLoader(Dataset):
   def __init__(self, examples, model):
@@ -116,7 +116,7 @@ def eval_checkpoint(data_file, checkpoint=None):
   return result
 
 
-def train_model(train_file=None):
+def train_model(train_file=None, out_dir=None):
   examples = load_examples(train_file or config.verifier_training_data)
   print(f"Loaded {len(examples)} examples")
 
@@ -204,7 +204,7 @@ def train_model(train_file=None):
   plt.grid(True)
 
   plt.tight_layout()
-  save_dir = config.verifier_output_dir / "trained_model"
+  save_dir = Path(out_dir or config.verifier_output_dir) / "trained_model"
   save_dir.mkdir(exist_ok=True, parents=True)
   plt.savefig(save_dir / "training_curves.png")  # plt.show() blocks / does nothing headless
   plt.close()
@@ -219,6 +219,8 @@ if __name__ == "__main__":
   ap.add_argument("--data", type=Path, default=config.verifier_training_data, help="examples json from prepare.py")
   ap.add_argument("--eval-only", action="store_true", help="score the saved checkpoint on all of --data")
   ap.add_argument("--checkpoint", type=Path, default=None, help="default: config.verifier_checkpoint")
+  ap.add_argument("--out-dir", type=Path, default=None,
+                  help="save to <out-dir>/trained_model (default: config.verifier_output_dir, overwrites the current model)")
   args = ap.parse_args()
 
   if not args.data.exists():
@@ -226,4 +228,4 @@ if __name__ == "__main__":
   elif args.eval_only:
     eval_checkpoint(args.data, args.checkpoint)
   else:
-    train_model(args.data)
+    train_model(args.data, args.out_dir)

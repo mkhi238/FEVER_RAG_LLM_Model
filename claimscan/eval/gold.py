@@ -1,19 +1,17 @@
 """FEVER claims and gold evidence for evaluation.
 
-Line-0 fix: the HF ``fever`` v1.0 loader stores sentence 0 as -1 (0 is falsy), so in our
-evidence parquet / fever_gold.json every SUPPORTS/REFUTES evidence row that says line -1
-really means line 0 (no row has line 0; ~37% have -1). NOT ENOUGH INFO claims have no
-evidence (url null, line -1). Every loader here maps -1 -> 0 for evidence that has a page.
+Read from the SQLite tables in claimscan/data/fever_db.py. Line 0: the HF ``fever`` loader wrote
+sentence 0 as -1; the evidence table stores it as 0 already, and fix_line (-1 -> 0) is kept for any
+old -1 values. NOT ENOUGH INFO claims have no evidence rows.
 """
 from __future__ import annotations
 
-import json
 import re
 import unicodedata
 
 import pandas as pd
 
-from claimscan.config import config
+from claimscan.data import fever_db
 
 SPLIT_ALIASES = {"val": "validation", "labelled_dev": "validation", "paper_test": "test"}
 
@@ -32,36 +30,33 @@ def docid(page, line) -> str:
   return f"{norm_title(page)}#{int(line)}"
 
 
-def load_claims(split: str = "validation", path=None) -> pd.DataFrame:
-  """Columns id (int), claim (str), label_text (TRUE / FALSE / NOT ENOUGH INFO)."""
-  df = pd.read_parquet(path or config.claims_file, columns=["id", "claim", "split", "label_text"])
-  df["split"] = df["split"].replace(SPLIT_ALIASES)
-  df = df[df["split"] == split].copy()
-  df["id"] = df["id"].astype(int)
-  df["claim"] = df["claim"].astype(str)
-  return df.drop_duplicates("id").reset_index(drop=True)
+def load_claims(split: str = "validation", db=None) -> pd.DataFrame:
+  """Columns id (int), claim (str), split, label_text (TRUE / FALSE / NOT ENOUGH INFO)."""
+  df = fever_db.claims(SPLIT_ALIASES.get(split, split), db=db)
+  return df[["id", "claim", "split", "label_text"]].drop_duplicates("id").reset_index(drop=True)
 
 
-def load_gold_pairs(path=None) -> dict[int, list[tuple[str, int]]]:
-  """{claim id: [(page, line), ...]} from fever_gold.json (SUPPORTS/REFUTES claims only), line-0 fixed."""
-  with open(path or config.gold_file, "r", encoding="utf-8") as f:
-    raw = json.load(f)
-  return {int(k): [(norm_title(p), fix_line(l)) for p, l in pairs] for k, pairs in raw.items()}
+def load_gold_pairs(db=None) -> dict[int, list[tuple[str, int]]]:
+  """{claim id: [(page, line), ...]} for SUPPORTS/REFUTES claims, in file order, no repeats."""
+  out: dict[int, list[tuple[str, int]]] = {}
+  ev = fever_db.evidence(db=db)
+  for cid, page, line in zip(ev["claim_id"], ev["page"], ev["line"]):
+    pairs = out.setdefault(int(cid), [])
+    pair = (norm_title(page), fix_line(line))
+    if pair not in pairs:
+      pairs.append(pair)
+  return out
 
 
-def load_gold_sets(claim_ids=None, path=None) -> dict[int, list[list[str]]]:
-  """{claim id: [[docid, ...], ...]}: one inner list per FEVER evidence set.
-
-  A set is all rows sharing evidence_annotation_id, matching how the original FEVER
-  jsonl groups evidence. NEI claims (no page) get no entry.
-  """
-  ev = pd.read_parquet(path or config.evidence)
-  ev = ev[ev["evidence_wiki_url"].notna() & (ev["evidence_wiki_url"] != "")]
+def load_gold_sets(claim_ids=None, db=None) -> dict[int, list[list[str]]]:
+  """{claim id: [[docid, ...], ...]}: one inner list per FEVER evidence set (rows sharing set_id).
+  NEI claims (no evidence) get no entry."""
+  ev = fever_db.evidence(db=db)
   if claim_ids is not None:
-    ev = ev[ev["id"].isin(set(int(c) for c in claim_ids))]
+    ev = ev[ev["claim_id"].isin(set(int(c) for c in claim_ids))]
   out: dict[int, list[list[str]]] = {}
-  for (cid, _), g in ev.groupby(["id", "evidence_annotation_id"], sort=False):
-    s = sorted({docid(p, fix_line(l)) for p, l in zip(g["evidence_wiki_url"], g["evidence_sentence_id"])})
+  for (cid, _), g in ev.groupby(["claim_id", "set_id"], sort=False):
+    s = sorted({docid(p, fix_line(l)) for p, l in zip(g["page"], g["line"])})
     sets = out.setdefault(int(cid), [])
     if s not in sets:
       sets.append(s)

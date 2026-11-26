@@ -57,13 +57,11 @@ def test_bm25_jsonl_and_lucene_search_end_to_end(tmp_path):
   from claimscan.retrieval import bm25_index
   from claimscan.retrieval.bm25_retriever import BM25Retriever
 
-  corpus = tmp_path / "corpus.parquet"
-  pd.DataFrame({
-    "id": ["Barack_Obama", "Barack_Obama", "Tokyo", "Cat"],
-    "line": [0, 1, 0, 0],
-    "text": ["barack obama was born in honolulu hawaii", "he was the 44th president",
-             "tokyo is the capital of japan", "cats are small mammals"],
-  }).to_parquet(corpus)
+  from claimscan.data import fever_db
+  corpus = tmp_path / "fever.sqlite"
+  fever_db.write_sentences([("Barack_Obama", 0, "barack obama was born in honolulu hawaii"),
+                            ("Barack_Obama", 1, "he was the 44th president"),
+                            ("Tokyo", 0, "tokyo is the capital of japan"), ("Cat", 0, "cats are small mammals")], corpus)
 
   n = bm25_index.write_jsonl(corpus, tmp_path / "jsonl", part_rows=3)
   assert n == 4 and sorted(p.name for p in (tmp_path / "jsonl").iterdir()) == ["sentences_000.jsonl", "sentences_001.jsonl"]

@@ -47,7 +47,7 @@ services:
     image: ${LLAMA_IMAGE:-ghcr.io/ggml-org/llama.cpp:server}
     init: true
     ports:
-      - "${LLAMA_PORT:-8083}:8080"            # host 8083 = aggregator.base_url in configs/default.yaml
+      - "${LLAMA_PORT:-8083}:8080"            # host 8083 = the aggregator port in llamacpp/roles.yaml
     volumes:
       - ${LLAMA_MODELS_DIR:-/mnt/e/llm/models}:/models:ro
     command:

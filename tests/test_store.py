@@ -1,8 +1,9 @@
-"""SentenceStore: build from a tiny corpus parquet, look sentences up, and drive the pipeline with it."""
+"""SentenceStore: build a tiny SQLite store, look sentences up, and drive the pipeline with it."""
 import pandas as pd
 import torch
 
-from claimscan.evidence.store import SentenceStore, build
+from claimscan.data import fever_db
+from claimscan.evidence.store import SentenceStore
 from claimscan.pipeline import Services, fact_check_cleaned, fact_check_detailed
 
 CORPUS = pd.DataFrame({"id": ["Tokyo", "Tokyo", "Japan"], "line": [0, 1, 0],
@@ -25,9 +26,8 @@ class Verifier:
 
 
 def _store(tmp_path):
-  src, out = tmp_path / "corpus.parquet", tmp_path / "s.sqlite"
-  CORPUS.to_parquet(src)
-  build(src, out, batch=2)
+  out = tmp_path / "s.sqlite"
+  fever_db.write_sentences(CORPUS.itertuples(index=False), out)
   return SentenceStore(out)
 
 
@@ -37,6 +37,7 @@ def test_build_and_lookup(tmp_path):
   df = s.for_hits(HITS)
   assert list(df.index) == [("Japan", 0), ("Tokyo", 0)]   # missing sentence is just absent
   assert df.loc[("Tokyo", 0), "text"] == "tokyo is the capital of japan"
+  assert s.lookup("Japan", 0) == "japan is an island country" and s.lookup("Nowhere", 3) is None
 
 
 def test_store_gives_same_answer_as_dataframe(tmp_path):

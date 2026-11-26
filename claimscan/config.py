@@ -6,7 +6,7 @@ Values come from ``configs/default.yaml`` (or the file named by ``CLAIMSCAN_CONF
 ``aggregator.*``. Importing this module never creates directories; scripts that write output create their own.
 
 The attribute names match the old ``rag/Verifier/config.py`` ``VerifierConfig`` so
-existing call sites (``config.corpus``, ``config.verifier_output_dir`` ...) keep working.
+existing call sites (``config.verifier_output_dir`` ...) keep working.
 """
 from __future__ import annotations
 
@@ -25,12 +25,8 @@ class ClaimScanConfig:
   artifacts_root: Path
   hf_home: Path | None
 
-  # data
+  # data (claims, gold evidence and sentences are all in sentence_store, see claimscan/data/fever_db.py)
   data_processed: Path
-  claims_file: Path
-  gold_file: Path
-  corpus: Path
-  evidence: Path
 
   # retriever
   retriever_index_dir: Path
@@ -96,10 +92,13 @@ class ClaimScanConfig:
 
   # rear aggregator (LLM veto over the verifier's verdict); see aggregator: in default.yaml
   aggregator_enabled: bool = False
-  aggregator_base_url: str = "http://127.0.0.1:8083/v1"
+  aggregator_base_url: str | None = None   # None = the aggregator port in llamacpp/roles.yaml; set by CLAIMSCAN_AGGREGATOR_URL
   aggregator_model: str = "gemma"
   aggregator_timeout: float = 30.0
   aggregator_api_key_env: str = ""   # NAME of the env var holding the key; "" = local llama-server
+
+  # verifier used at inference: "ours" (verifier_checkpoint) or a HuggingFace NLI model name
+  verifier_inference_model: str = "ours"
 
   @property
   def bm25_index_dir(self) -> Path:
@@ -111,8 +110,7 @@ class ClaimScanConfig:
 
   @property
   def sentence_store(self) -> Path:
-    """SQLite (page, line) -> text store the API reads instead of the full corpus.
-    Build: python -m claimscan.evidence.store build"""
+    """The one FEVER SQLite file: sentences, claims, evidence (claimscan/data/fever_db.py builds it)."""
     return self.data_processed / "fever_sentences.sqlite"
 
   @property
@@ -148,10 +146,6 @@ def load_config(path: str | os.PathLike | None = None) -> ClaimScanConfig:
     artifacts_root=root,
     hf_home=Path(hf_home) if hf_home else None,
     data_processed=p["data_processed"],
-    claims_file=p["claims_file"],
-    gold_file=p["gold_file"],
-    corpus=p["corpus"],
-    evidence=p["evidence"],
     retriever_index_dir=p["retriever_index_dir"],
     retriever_model=r["model"],
     retriever_index_file=r["index_file"],
@@ -199,10 +193,11 @@ def load_config(path: str | os.PathLike | None = None) -> ClaimScanConfig:
     rerank_openai_base_url=str(rr.get("openai_base_url", "https://api.openai.com/v1")),
     rerank_openai_mode=str(rr.get("openai_mode", "pointwise")),
     aggregator_enabled=_env_bool("CLAIMSCAN_AGGREGATOR_ENABLED", bool(ag.get("enabled", False))),
-    aggregator_base_url=str(os.environ.get("CLAIMSCAN_AGGREGATOR_URL", ag.get("base_url", "http://127.0.0.1:8083/v1"))),
+    aggregator_base_url=os.environ.get("CLAIMSCAN_AGGREGATOR_URL") or None,
     aggregator_model=str(os.environ.get("CLAIMSCAN_AGGREGATOR_MODEL", ag.get("model", "gemma"))),
     aggregator_timeout=float(os.environ.get("CLAIMSCAN_AGGREGATOR_TIMEOUT", ag.get("timeout", 30.0))),
     aggregator_api_key_env=str(os.environ.get("CLAIMSCAN_AGGREGATOR_API_KEY_ENV", ag.get("api_key_env") or "")),
+    verifier_inference_model=str(v.get("inference_model", "ours")),
   )
 
   # Must happen before transformers / sentence_transformers are imported.
@@ -217,10 +212,7 @@ config = load_config()
 
 def validate_config(cfg: ClaimScanConfig = config):
   required_files = [
-    cfg.claims_file,
-    cfg.gold_file,
-    cfg.corpus,
-    cfg.evidence,
+    cfg.sentence_store,
   ]
 
   required_dirs = [
