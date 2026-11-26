@@ -28,6 +28,11 @@ MODULES = [
   "claimscan.instruct.rear_aggregator",
   "claimscan.data.posttrain_store",
   "claimscan.graph",
+  "claimscan.rerank",
+  "claimscan.rerank.base",
+  "claimscan.rerank.cohere",
+  "claimscan.rerank.openai_llm",
+  "claimscan.rerank.cross_encoder",
 ]
 NEEDS_FAISS = [
   "claimscan.retrieval.faiss_retriever",

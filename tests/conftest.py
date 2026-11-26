@@ -4,6 +4,9 @@ def pytest_addoption(parser):
   parser.addoption("--verifier", default=None,
                    help="verifier for the FEVER suite: default verifier.inference_model from the config; 'ours' "
                         "(the trained checkpoint), a HuggingFace NLI model, or a path to a model.pt")
+  parser.addoption("--aggregator", default="aggregator_dpo",
+                   help="rear aggregator for the FEVER suite: an adapter dir under <artifacts>/models (default: the "
+                        "trained DPO one) whose labels are scored, or 'none' for the verifier's labels")
   parser.addoption("--gold-split", default="validation", choices=["validation", "train"],
                    help="claims for the gold-evidence test: 'validation' (the suite's) or 200 TRUE/FALSE train claims")
 

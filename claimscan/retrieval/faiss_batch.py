@@ -44,7 +44,10 @@ class IVFListScanner:
     import faiss
 
     self.path = Path(index_path)
-    self.index = faiss.read_index(str(self.path), faiss.IO_FLAG_MMAP)
+    # an on-disk index (faiss_extend.py: <name>.bin + <name>.ivfdata) keeps the lists in the .ivfdata file;
+    # it must not be opened with IO_FLAG_MMAP (faiss segfaults)
+    ondisk = self.path.with_suffix(".ivfdata").exists()
+    self.index = faiss.read_index(str(self.path), 0 if ondisk else faiss.IO_FLAG_MMAP)
     ivf = faiss.downcast_index(faiss.extract_index_ivf(self.index))
     if not isinstance(ivf, faiss.IndexIVFFlat):
       raise TypeError(f"expected IndexIVFFlat, got {type(ivf).__name__}")
@@ -53,13 +56,22 @@ class IVFListScanner:
     self.ivf, self.d, self.nlist, self.nprobe = ivf, ivf.d, ivf.nlist, nprobe
     self.ntotal = ivf.ntotal
 
-    # file offset of each list's codes and ids, from their addresses inside faiss's mmap
-    base = _mapping_start(self.path)
     inv = ivf.invlists
     code_size = inv.code_size
     self.sizes = np.zeros(self.nlist, dtype=np.int64)
     self.code_off = np.zeros(self.nlist, dtype=np.int64)
     self.ids_off = np.zeros(self.nlist, dtype=np.int64)
+    if ondisk:   # each list: codes (capacity * code_size bytes), then ids (capacity * 8), at its offset
+      od = faiss.downcast_InvertedLists(inv)
+      self.data_path = Path(od.filename)
+      for l in range(self.nlist):
+        e = od.lists.at(l)
+        self.sizes[l], self.code_off[l], self.ids_off[l] = e.size, e.offset, e.offset + e.capacity * code_size
+      self._check_offsets(inv, code_size)
+      return
+    # file offset of each list's codes and ids, from their addresses inside faiss's mmap
+    self.data_path = self.path
+    base = _mapping_start(self.path)
     for l in range(self.nlist):
       n = inv.list_size(l)
       self.sizes[l] = n
@@ -74,7 +86,7 @@ class IVFListScanner:
     import faiss
 
     nonempty = np.flatnonzero(self.sizes)
-    with open(self.path, "rb") as f:
+    with open(self.data_path, "rb") as f:
       for l in (nonempty[0], nonempty[-1]):
         n = int(min(self.sizes[l], 4))
         want = faiss.rev_swig_ptr(inv.get_ids(int(l)), n).tobytes()
@@ -87,7 +99,7 @@ class IVFListScanner:
     return lists
 
   def _read_lists(self, lists, out_q):
-    fd = os.open(self.path, os.O_RDONLY)
+    fd = os.open(self.data_path, os.O_RDONLY)
     try:
       for l in lists:
         n = int(self.sizes[l])

@@ -14,6 +14,11 @@ same sample, so it reuses those hits too (a fresh 10-claim sample would need a f
 The corpus sentences those hits point at are cut from the 4 GB corpus once and cached in <eval_dir>/fever_suite.
 If the cached hits are missing, they are rebuilt once with the benchmark's own _retrieve stage (~15 min).
 
+Current pipeline on top of that: the FAISS hits come from the index in the config (cached per index file), the
+reranker in the config (rerank.backend, Cohere) reorders the 100 fused candidates, and the final label is the rear
+aggregator's (the trained Gemma adapter, --aggregator; 'none' = the verifier's label). Every aggregator reply is
+saved to <eval_dir>/fever_suite/agg_responses_n<N>.jsonl.
+
 One test, test_suite_matches_baseline, checks against tests/data/fever_suite_hybrid_norm3_baseline.json
 (benchmark run 20261124-220309, hybrid_norm3):
   - any N: per-claim predicted labels, at most MAX_FLIPS differ
@@ -49,7 +54,7 @@ def balanced_slice(claims, n: int):
   return claims.iloc[keep].reset_index(drop=True)
 
 
-def _services_factory(cfg, B, all_fused: dict, base: dict, out_dir: Path, verifier: str):
+def _services_factory(cfg, B, all_fused: dict, base: dict, out_dir: Path, verifier: str, index_tag: str):
   """Verifier on 2 CPU threads + the corpus rows of every page in the 300 claims' top-k hybrid hits.
 
   The subset is cut from the 4 GB corpus once (the slow part, minutes on D:) and cached as a small parquet,
@@ -60,18 +65,45 @@ def _services_factory(cfg, B, all_fused: dict, base: dict, out_dir: Path, verifi
   import torch
   from claimscan.evidence.select import index_corpus
   from claimscan.pipeline import Services, load_verifier
+  from claimscan.rerank import load_reranker
 
   torch.set_num_threads(2)
-  path = out_dir / f"corpus_{base['claims_key']}_{RETRIEVER}_k{base['k']}.parquet"
+  reranker = load_reranker(cfg)
+  depth = cfg.rerank_candidates if reranker else base["k"]   # the reranker reads every candidate's sentence
+  path = out_dir / f"corpus_{base['claims_key']}_{RETRIEVER}{index_tag}_k{depth}.parquet"
   if path.exists():
     corpus = index_corpus(pd.read_parquet(path))
   else:
-    pages = {h["id"] for hl in all_fused.values() for h in hl[:base["k"]]}
+    pages = {h["id"] for hl in all_fused.values() for h in hl[:depth]}
     corpus = B.load_corpus_subset(pages, cfg)
     out_dir.mkdir(parents=True, exist_ok=True)
     corpus.reset_index().to_parquet(path)
   model = load_verifier(cfg, verifier)
-  return lambda retr: Services(model=model, retriever=retr, corpus_df=corpus)
+  return lambda retr: Services(model=model, retriever=retr, corpus_df=corpus, reranker=reranker)
+
+
+def _aggregator(cfg, name: str, records: list):
+  """decider for e2e_stage: the rear aggregator's label; each claim's reply is appended to ``records``."""
+  if name == "none":
+    return None
+  path = Path(cfg.artifacts_root) / "models" / name
+  if not path.exists():
+    pytest.skip(f"aggregator adapter missing: {path}")
+  torch = pytest.importorskip("torch")
+  if not torch.cuda.is_available():
+    pytest.skip("the aggregator needs the GPU")
+  from claimscan.aggregation import aggregate_verdict, build_hf_llm
+  llm = build_hf_llm(path)
+
+  def decide(claim, v):
+    a = aggregate_verdict(claim, v, llm)
+    records.append({"claim": claim, "verifier_label": a.verifier_label, "label": a.label,
+                    "verifier_conf": round(v.confidence, 3), "veto_requested": a.veto_requested,
+                    "vetoed": a.vetoed, "llm_confidence": a.llm_confidence, "veto_reason": a.veto_reason,
+                    "explanation": a.explanation, "error": a.aggregator_error,
+                    "evidence": [f"[{d}] {t}" for t, d in v.evidence[:5]]})
+    return a.label
+  return decide
 
 
 @pytest.fixture(scope="module")
@@ -96,9 +128,13 @@ def suite(request):
   sample = pd.read_parquet(claims_file)
   assert B.claims_key(sample["id"]) == base["claims_key"], "claim sample differs from the baseline's"
 
+  index_tag = "" if cfg.retriever_index_file == base.get("index_file", "faiss_index_175.bin") \
+    else "_" + Path(cfg.retriever_index_file).stem   # FAISS hits from another index are cached separately
   hits = {}
   for name in BASES:
     path = B._hits_path(cache, name, base["claims_key"], base["candidates"])
+    if name == "faiss" and index_tag:
+      path = path.with_name(path.stem + index_tag + path.suffix)
     if not path.exists():
       B.run_subprocess(["_retrieve", "--retriever", name, "--claims-file", str(claims_file), "--out", str(path),
                         "--candidates", str(base["candidates"]), "--threads", "2", "--latency-samples", "0"],
@@ -118,18 +154,28 @@ def suite(request):
   retrieval = B.retrieval_metrics(fused, gold)
   out_dir = Path(cfg.eval_dir) / "fever_suite"
   verifier = request.config.getoption("--verifier") or cfg.verifier_inference_model
+  aggregator = request.config.getoption("--aggregator")
   tag = "" if verifier == base["verifier"] else "_" + verifier.replace("/", "__")   # other verifiers: own files
-  services_factory = _services_factory(cfg, B, all_fused, base, out_dir, verifier)
+  tag += "_noagg" if aggregator == "none" else ""
+  services_factory = _services_factory(cfg, B, all_fused, base, out_dir, verifier, index_tag)
+  records = []
+  decider = _aggregator(cfg, aggregator, records)
   e2e = B.e2e_stage(claims, {RETRIEVER: fused}, out_dir / f"e2e_n{n}{tag}.json", k=base["k"],
                     conf_threshold=base["conf_threshold"], threads=2, services_factory=services_factory,
-                    gold=gold, cfg=cfg)[RETRIEVER]
+                    gold=gold, cfg=cfg, decider=decider)[RETRIEVER]
+  if records:
+    with open(out_dir / f"agg_responses_n{n}{tag}.jsonl", "w") as f:
+      for c, r in zip(claims.itertuples(), records):
+        f.write(json.dumps({"id": int(c.id), "gold": c.label_text, **r}) + "\n")
   preds = pd.read_parquet(out_dir / f"e2e_n{n}{tag}.predictions.parquet")
   pred = {int(r.id): r.pred for r in preds.itertuples()}
   flips = [{"id": i, "gold": base["predictions"][str(i)]["gold"], "baseline": base["predictions"][str(i)]["pred"],
             "now": pred[i]} for i in ids if pred[i] != base["predictions"][str(i)]["pred"]]
 
   result = {"timestamp": datetime.now().isoformat(timespec="seconds"), "n_claims": n, "retriever": RETRIEVER,
-            "verifier": verifier, "baseline_verifier": base["verifier"],
+            "verifier": verifier, "baseline_verifier": base["verifier"], "faiss_index": cfg.retriever_index_file,
+            "reranker": cfg.rerank_backend, "aggregator": aggregator,
+            "vetoes": sum(r["vetoed"] for r in records), "aggregator_errors": sum(bool(r["error"]) for r in records),
             "labels": claims["label_text"].value_counts().to_dict(), "retrieval": retrieval, "e2e": e2e,
             "flips_vs_baseline": flips, "baseline": {"retrieval": base["retrieval"], "e2e": base["e2e"]},
             "wall_clock_s": round(time.perf_counter() - t, 1)}
