@@ -108,6 +108,9 @@ verifier:
   # Verifier the pipeline / API / benchmark use: "ours" (verifier_output_dir/trained_model/model.pt)
   # or a HuggingFace NLI model, e.g. MoritzLaurer/DeBERTa-v3-base-mnli-fever-anli (claimscan/verifier/hf_nli.py)
   inference_model: MoritzLaurer/DeBERTa-v3-base-mnli-fever-anli
+  # TRUE/FALSE -> NOT ENOUGH INFO when the verifier's P(NEI) >= this (null = off). 0.2 chosen 2026-11-26 on the
+  # FEVER suite's 300 claims: label acc 0.650 -> 0.670 (NEI right 28% -> 39%, TRUE 91 -> 90%, FALSE 76 -> 72%).
+  nei_prob_threshold: 0.2
   batch_size: 8
   learning_rate: 2.0e-5
   num_epochs: 3

@@ -89,7 +89,8 @@ def verify(model, claim, evidence):
 
 
 def fact_check(claim, services: Services):
-
+  
+  #k = 30 is a tunable hyperparameter
   evidence_results = services.retriever.search(claim, k=30)
 
   print(f"Retrieved {len(evidence_results)} results from FAISS")
@@ -130,7 +131,7 @@ class Verdict:
   confidence: float                 # max verifier probability (0.0 when no evidence was found)
   probs: dict | None                # {"TRUE": p, "FALSE": p, "NOT ENOUGH INFO": p}, None without evidence
   evidence: list                    # [(text, "Page#line"), ...] sent to the verifier, best first
-  downgraded: bool = False          # TRUE/FALSE turned into NEI by the confidence threshold
+  downgraded: bool = False          # TRUE/FALSE turned into NEI (max prob < conf_threshold, or P(NEI) >= nei_prob_threshold)
   # every retrieved hit, best first: {"rank", "id", "line", "docid", "score", "text"} (text None if not in the corpus).
   # This is what an LLM layer reads to synthesise over the top k instead of the verifier's 3 sentences.
   hits: list = field(default_factory=list)
@@ -172,6 +173,9 @@ def fact_check_detailed(claim, services: Services, k=30, conf_threshold=0.5) -> 
 
   confidence = torch.max(probs).item()
   downgraded = confidence < conf_threshold and prediction != "NOT ENOUGH INFO"
+  nei_cut = config.verifier_nei_prob_threshold   # verifier.nei_prob_threshold: P(NEI) >= it -> NEI
+  if nei_cut is not None and prediction != "NOT ENOUGH INFO" and probs[2].item() >= nei_cut:
+    downgraded = True
   if downgraded:
     prediction = "NOT ENOUGH INFO"
 
