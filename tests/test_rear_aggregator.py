@@ -29,6 +29,8 @@ from pydantic import BaseModel
 
 from claimscan.instruct.schemas import ClaimResult, ClaimVerdict, Evidence, RearInput, RearOutput
 
+pytestmark = pytest.mark.usefixtures("veto_on")   # these test the veto gate; it is off by default
+
 ra = pytest.importorskip("claimscan.instruct.rear_aggregator")
 if not (hasattr(ra, "final_label") and hasattr(ra, "aggregate")):
   pytest.skip("rear aggregator contract not implemented yet", allow_module_level=True)
@@ -219,3 +221,9 @@ def test_unclear_removed():
   if "UNCLEAR" in ann:
     pytest.skip("UNCLEAR not removed from ClaimVerdict.verdict yet")
   assert set(LABELS) <= set(re.findall(r"'([A-Z ]+)'", ann))
+
+
+def test_veto_off_by_default_keeps_verifier_label(monkeypatch):
+  monkeypatch.setattr(ra, "VETO_ENABLED", False)
+  assert ra.final_label("TRUE", True, 0.3, 0.99) == "TRUE"
+  assert ra.final_label("FALSE", True, 0.99, 0.95) == "FALSE"

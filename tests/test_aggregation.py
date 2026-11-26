@@ -20,6 +20,8 @@ from claimscan.api import deps
 from claimscan.api.main import app
 from claimscan.pipeline import Services, Verdict
 
+pytestmark = pytest.mark.usefixtures("veto_on")   # these test the veto gate; it is off by default
+
 try:
   from claimscan.instruct import rear_aggregator as ra
   HAS_CONTRACT = hasattr(ra, "aggregate") and hasattr(ra, "final_label")

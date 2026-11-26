@@ -14,6 +14,9 @@ from claimscan.instruct.schemas import ClaimResult, ClaimVerdict, Label, RearInp
 #Label is Pydantic class in schemas
 
 NEI = "NOT ENOUGH INFO"
+# Veto power OFF (2026-11-26): the trained Gemma adapter vetoed 122/300 claims, 84 of them correct verdicts
+# (FEVER suite acc 0.65 -> 0.46). With it off the LLM only explains; its veto request stays visible in the output.
+VETO_ENABLED = False
 
 
 class VetoOutput(BaseModel):
@@ -40,9 +43,9 @@ def build_messages(result: ClaimResult) -> list:
 
 
 def final_label(verifier_label: Label, veto: bool, verifier_conf, llm_conf):
-  """NEI only when veto and verifier_label != NEI and (verifier_conf < 0.6 or llm_conf >= 0.9);
+  """verifier_label while VETO_ENABLED is False. Otherwise: NEI only when veto and verifier_label != NEI and (verifier_conf < 0.6 or llm_conf >= 0.9);
   otherwise verifier_label. Never flips TRUE <-> FALSE."""
-  if veto and verifier_label != NEI and (verifier_conf < 0.6 or llm_conf >= 0.9):
+  if VETO_ENABLED and veto and verifier_label != NEI and (verifier_conf < 0.6 or llm_conf >= 0.9):
     verifier_label = NEI
     return verifier_label
   else:

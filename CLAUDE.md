@@ -44,8 +44,12 @@ python scripts/verifier_smoke.py
 - 2026-11-26 `/fever-full-test 300` (full index + Cohere rerank + trained Gemma DPO aggregator; the suite now scores the aggregator's label):
   verifier label acc 0.65 / FEVER 0.467; aggregator 0.463 / 0.373 (122 vetoes, 84 of them on correct verdicts). The DPO adapter
   copies its SFT targets (llm_confidence always 0.95/0.05, so the >= 0.9 gate never filters). Replies: `<artifacts>/eval/fever_suite/agg_responses_n300.jsonl`.
+  Why 0.65 (same run): per gold label the verifier gets TRUE 91%, FALSE 76%, NEI 28%; 72 of the 105 errors are NEI claims called
+  TRUE/FALSE (50 with conf >= 0.9), and in samples several are really supported by the retrieved sentences (FEVER NEI label noise).
+  Retrieval isn't the limit: full gold set sent for 131/200 TRUE/FALSE claims, verifier right on 85% of those.
   The full index is slow cold through the API (30-110 s per FAISS query from D:); the eval's batch search is fine.
-- Rear aggregator veto: fixed in `rear_aggregator.final_label` (verifier conf < 0.6 or LLM conf >= 0.9), not configurable.
+- Rear aggregator veto: OFF since 2026-11-26 (`rear_aggregator.VETO_ENABLED = False`; the LLM only explains). When on, the gate in
+  `rear_aggregator.final_label` is verifier conf < 0.6 or LLM conf >= 0.9. Gate tests switch it on with the `veto_on` fixture.
   Hosted LLM = Together AI (`ChatTogether` in `aggregation.build_llm`): setting `aggregator.api_key_env` (the env var NAME, never the key) switches to it; local llama-server goes through `instruct/chat_clients.build_chat`.
 - Future direction (settled): a paper-reading helper. Highlight a term, get a grounded 1-2 sentence RAG definition.
 
