@@ -24,6 +24,10 @@ python scripts/verifier_smoke.py
 - pytest uses `--capture=sys` (pyproject). The default tmpfile capture breaks on drvfs.
 - Skills: `/unit-tests [N|file|-k]` = is the code correct (pass/fail); `/fever-full-test [N]` = how accurate is the system (FEVER metric vs baseline).
 - CI: `.github/workflows/unit-tests.yml` runs the unit tests on every push (no artifacts, offline HF), so artifact tests must skip themselves.
+- Skills: `/unit-tests [N|file|-k]` = is the code correct (pass/fail); `/fever-full-test [N]` = how accurate is the system (FEVER metric vs baseline).
+- CI: `.github/workflows/unit-tests.yml` runs the unit tests on every push (no artifacts, offline HF), so artifact tests must skip themselves.
+- Skills: `/unit-tests [N|file|-k]` = is the code correct (pass/fail); `/fever-full-test [N]` = how accurate is the system (FEVER metric vs baseline).
+- CI: `.github/workflows/unit-tests.yml` runs the unit tests on every push (no artifacts, offline HF), so artifact tests must skip themselves.
 - Machine: 15 GB RAM, RTX 2060 6 GB (sm_75), 6 cores. Design for that.
 - `HF_HOME` in the user's shell is `/mnt/d/whisper_v2/hf_cache` (on D:, fine; it wins over `hf_home` in config).
 - Git remote is SSH and works: `git push` is fine when the user asks.
