@@ -68,8 +68,9 @@ rerank:
   openai_mode: pointwise    # pointwise | listwise
 
 # Rear aggregator: an LLM (Gemma GGUF on llama-server) reads the verifier's verdict + evidence and may
-# veto it, which only turns TRUE/FALSE into NOT ENOUGH INFO (claimscan/aggregation.py). The veto gate is
-# fixed in rear_aggregator.final_label: applied only if verifier conf < 0.6 OR llm_confidence >= 0.9. API only; the
+# veto it, which only turns TRUE/FALSE into NOT ENOUGH INFO (claimscan/aggregation.py). Veto power is OFF
+# (rear_aggregator.VETO_ENABLED = False, 2026-11-26: it cut FEVER-suite accuracy 0.65 -> 0.46), so it only explains.
+# With it on, the gate in rear_aggregator.final_label applies a veto only if verifier conf < 0.6 OR llm_confidence >= 0.9. API only; the
 # benchmark never uses it. Fails open: if the server is down the verifier's verdict is returned.
 # Env: CLAIMSCAN_AGGREGATOR_ENABLED (1/0), CLAIMSCAN_AGGREGATOR_URL, CLAIMSCAN_AGGREGATOR_MODEL,
 #      CLAIMSCAN_AGGREGATOR_TIMEOUT, CLAIMSCAN_AGGREGATOR_API_KEY_ENV

@@ -21,6 +21,8 @@ from claimscan.api import deps
 from claimscan.api.main import app
 from claimscan.pipeline import Services, Verdict
 
+pytestmark = pytest.mark.usefixtures("veto_on")   # these test the veto gate; it is off by default
+
 langchain_openai = pytest.importorskip("langchain_openai")
 
 try:

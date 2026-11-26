@@ -27,3 +27,13 @@ def pytest_collection_modifyitems(config, items):
     _deselect(config, items, "gold_evidence")
   if not (any("test_fever_suite" in a for a in config.args) or "fever_suite" in (config.getoption("-m") or "")):
     _deselect(config, items, "fever_suite")
+
+
+import pytest  # noqa: E402
+
+
+@pytest.fixture
+def veto_on(monkeypatch):
+  """The veto-gate tests: switch the rear aggregator's veto back on (it is off by default, rear_aggregator.VETO_ENABLED)."""
+  ra = pytest.importorskip("claimscan.instruct.rear_aggregator")
+  monkeypatch.setattr(ra, "VETO_ENABLED", True)
