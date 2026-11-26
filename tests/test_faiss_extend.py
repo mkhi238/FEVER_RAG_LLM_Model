@@ -34,3 +34,9 @@ def test_extend_adds_missing_shards(tmp_path):
   _, hit = new.search(q, 1)
   assert [all_ids[i] for i in hit[:, 0]] == all_ids   # every vector finds itself, with its own docid
   assert not (tmp_path / "faiss_index_full_blocks").exists()
+
+  # the batched eval search (faiss_batch) reads the merged index's lists from the .ivfdata file
+  from claimscan.retrieval.faiss_batch import IVFListScanner
+  D, I = new.search(q[:50], 5)
+  sD, sI = IVFListScanner(tmp_path / "faiss_index_full.bin", nprobe=8).search(q[:50], 5)
+  assert (sI == I).all() and np.allclose(sD, D, atol=1e-5)

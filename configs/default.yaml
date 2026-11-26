@@ -22,8 +22,8 @@ paths:
 
 retriever:
   model: BAAI/bge-small-en-v1.5
-  index_file: faiss_index_175.bin
-  docids_file: all_docids_175.csv
+  index_file: faiss_index_full.bin    # all 253 shards (25.2M); faiss_index_175.bin = old 17.1M
+  docids_file: all_docids_full.csv
   nprobe: 64
   # Memory-map the index instead of loading it: ~0.85 GB RAM instead of 26 GB.
   # First query ~25 s (page cache warm-up), then ~0.1 s.
