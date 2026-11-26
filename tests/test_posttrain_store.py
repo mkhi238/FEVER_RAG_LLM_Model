@@ -74,19 +74,3 @@ def test_load_sft_dataset_rows(con):
   agg = next(r for r in ds if len(r["prompt"]) == 2)
   out = json.loads(agg["completion"][0]["content"])
   assert set(out) == {"veto", "veto_reason", "explanation", "llm_confidence"}
-
-
-def test_load_sft_dataset_split_and_per_source(con):
-  pytest.importorskip("datasets")
-  con.executemany("INSERT INTO sft_examples VALUES (?, ?, NULL, ?, 'a')",
-                  [("agg_x" if i % 2 else "liar", str(i), f"u{i}") for i in range(1, 41)])
-  con.commit()
-  train, held = P.load_sft_dataset(), P.load_sft_dataset(split="eval")
-  users = lambda ds: {r["prompt"][-1]["content"] for r in ds}
-  assert users(held) == set()   # rowids 20 and 40 are liar rows, not agg_*: nothing held out
-  con.execute("UPDATE sft_examples SET source = 'agg_x' WHERE rowid IN (20, 40)")
-  con.commit()
-  train, held = P.load_sft_dataset(), P.load_sft_dataset(split="eval")
-  assert users(held) == {"u20", "u40"} and not users(held) & users(train) and len(train) == 38
-  capped = P.load_sft_dataset(per_source=3)
-  assert len(capped) == 20 + 3   # every train agg_* row (20) plus 3 liar rows

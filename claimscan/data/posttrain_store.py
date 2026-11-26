@@ -198,19 +198,12 @@ def build_fever(con, n):
 
 # ---------- TRL dataset ----------
 
-def load_sft_dataset(limit=None, per_source=None, split="train"):
-  """Every row as {"prompt": [system?, user], "completion": [assistant]}, shuffled. limit = first N rows.
-  per_source = at most N rows from each non-aggregator source (agg_* rows are always all kept).
-  split: "eval" = every 20th agg_* row (by rowid), held out; "train" = everything else."""
+def load_sft_dataset(limit=None):
+  """Every row as {"prompt": [system?, user], "completion": [assistant]}, shuffled. limit = first N rows."""
   from datasets import Dataset
 
-  held = "source LIKE 'agg_%' AND rowid % 20 = 0"
-  where = held if split == "eval" else f"NOT ({held})"
   with sqlite3.connect(DB) as con:
-    df = pd.read_sql_query(f"SELECT * FROM sft_examples WHERE {where} ORDER BY RANDOM()", con)
-  if per_source:
-    agg = df.source.str.startswith("agg_")
-    df = pd.concat([df[agg], df[~agg].groupby("source").head(per_source)]).sample(frac=1, random_state=0)
+    df = pd.read_sql_query("SELECT * FROM sft_examples ORDER BY RANDOM()", con)
   if limit:
     df = df.head(limit)
 
