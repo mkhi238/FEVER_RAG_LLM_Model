@@ -12,7 +12,7 @@
 
 # --- models
 torch>=2.14
-transformers>=5.22,<6           # 5.x loads stored dtype; verifier/deberta_verifier.py casts DeBERTa back to fp32
+transformers>=5.22,<6           # 5.x loads stored dtype; verifier/hf_nli.py casts DeBERTa back to fp32
 sentencepiece>=0.2.3            # DeBERTa-v3 ships only spm.model ...
 protobuf>=7.36,<8               # ... and converting it to a fast tokenizer needs protobuf (without it
                                 # transformers falls back to tiktoken and fails on spm.model)

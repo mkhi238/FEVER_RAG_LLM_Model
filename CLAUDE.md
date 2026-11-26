@@ -19,7 +19,6 @@ splits claims, writes queries, decides search-again/stop → retrieve → rerank
 ```bash
 source .venv/bin/activate && source scripts/env.sh
 python -m pytest -q             # slow: D: is WSL drvfs
-python scripts/verifier_smoke.py
 ```
 - pytest uses `--capture=sys` (pyproject). The default tmpfile capture breaks on drvfs.
 - Skills: `/unit-tests [N|file|-k]` = is the code correct (pass/fail); `/fever-full-test [N]` = how accurate is the system (FEVER metric vs baseline).
@@ -31,7 +30,7 @@ python scripts/verifier_smoke.py
 ## Serving + graphs (2026-11-24)
 - API serves `pipeline.fact_check_detailed` (same logic as `fact_check_cleaned`, k=30, 0.5), so benchmark numbers = API behaviour. Keep it that way.
 - All FEVER data is in one SQLite file, `<artifacts>/data/processed/fever_sentences.sqlite` (tables sentences, claims, evidence;
-  `claimscan/data/fever_db.py` builds and reads it; moved off parquet 2026-11-25). Pipeline, eval, API and `verifier/prepare.py`
+  `claimscan/data/fever_db.py` builds and reads it; moved off parquet 2026-11-25). Pipeline, eval and API
   look sentences up there, never loading the 4 GB corpus. `docker/README.md` for the image (artifacts + HF cache mounted read-only).
 - `graphs/` is generated: `/graphs` skill or `python -m claimscan.graph.make_graphs`; never hand-edit it. A Stop hook (`.claude/hooks/graphs_if_stale.sh`) rebuilds it in the background when an eval result is newer.
 - Publishing: only working end-to-end parts go to `main` (merged from a separate `ship` branch built in its own worktree,
@@ -72,7 +71,7 @@ python scripts/verifier_smoke.py
 3. **Per-file check:** make every file run, be efficient for 15 GB RAM / 6 GB VRAM, and be clear. Known issues:
    - The 25.2M FAISS docid list (~2.5 GB) is loaded into RAM (peak RSS ~7 GB with the full index). (The corpus is no longer loaded: SQLite lookups, 2026-11-25.)
 4. **Next (when the user's RL training is off the machine):** `python -m claimscan.eval.eval_retriever --retriever faiss bm25 hybrid`,
-   then `python -m claimscan.eval.fever_eval --max-claims 200`; then rerun `verifier/prepare.py` (line 0 now fixed in the data) and retrain.
+   then `python -m claimscan.eval.fever_eval --max-claims 200`.
    `claimscan/instruct/` (front decomposer / rear aggregator, LangChain) is the user's; help only if asked.
    Decomposer = the research agent (local Qwen3-4B, RL-trained): splits claims, writes queries, decides search-again/stop.
 
@@ -83,7 +82,7 @@ python scripts/verifier_smoke.py
 
 ## Known data/model issues (for the plan)
 - **Default verifier (2026-11-25): `MoritzLaurer/DeBERTa-v3-base-mnli-fever-anli`** (`verifier.inference_model`,
-  `claimscan/verifier/hf_nli.py`; `ours` = the old `deberta_v1` checkpoint). With gold evidence on the suite's 200 TRUE/FALSE
+  `claimscan/verifier/hf_nli.py`, now the only verifier; the old self-trained `deberta_v1` code was removed on `overhaul`). With gold evidence on the suite's 200 TRUE/FALSE
   claims: ready-made 82%, old 57% (`pytest tests/test_fever_suite.py -k gold_evidence`). Leak check: 88% on FEVER train claims
   it saw vs 82% on our dev claims, so no sign of leakage (FEVER-NLI trains on FEVER train only). Weak spot: NEI recall 39%.
   The user decided not to fine-tune it for now; options if needed: confidence cut-off tuning, or fine-tune on NEI (VitaminC).

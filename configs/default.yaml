@@ -5,7 +5,7 @@
 # Where the 147 GB of data / FAISS / verifier artifacts live. Env: CLAIMSCAN_ARTIFACTS
 artifacts_root: /mnt/d/crisis-claim-analysis/artifacts
 
-# HuggingFace cache (bge-small and deberta-v3-base are already downloaded here).
+# HuggingFace cache (bge-small and the DeBERTa NLI verifier are already downloaded here).
 # Only applied if HF_HOME is not already set. Set to null to leave HF_HOME alone.
 hf_home: /mnt/d/huggingface_cache
 
@@ -104,22 +104,12 @@ dense_indexes:
 default_dense_index: bge_small
 
 verifier:
-  model: microsoft/deberta-v3-base
-  # Verifier the pipeline / API / benchmark use: "ours" (verifier_output_dir/trained_model/model.pt)
-  # or a HuggingFace NLI model, e.g. MoritzLaurer/DeBERTa-v3-base-mnli-fever-anli (claimscan/verifier/hf_nli.py)
+  # Verifier the pipeline / API / benchmark use: a HuggingFace NLI model (claimscan/verifier/hf_nli.py)
   inference_model: MoritzLaurer/DeBERTa-v3-base-mnli-fever-anli
   # TRUE/FALSE -> NOT ENOUGH INFO when the verifier's P(NEI) >= this (null = off). 0.2 chosen 2026-11-26 on the
   # FEVER suite's 300 claims: label acc 0.650 -> 0.670 (NEI right 28% -> 39%, TRUE 91 -> 90%, FALSE 76 -> 72%).
   nei_prob_threshold: 0.2
-  batch_size: 8
-  learning_rate: 2.0e-5
-  num_epochs: 3
   max_length: 512
-  warmup_steps: 500
-  negative_samples_per_claim: 1
-  max_evidence_sentences: 3
-  eval_batch_size: 32
-  num_labels: 3
 
 mlflow_experiment_name: fever_verifier
 mlflow_retriever_experiment: retriever_eval

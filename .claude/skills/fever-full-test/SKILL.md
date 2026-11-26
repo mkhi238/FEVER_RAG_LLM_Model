@@ -58,7 +58,7 @@ Read `<artifacts>/eval/fever_suite/latest_n<N>.json` (artifacts = `/mnt/d/crisis
 
 Baseline: `tests/data/fever_suite_hybrid_norm3_baseline.json` (re-baselined 2026-11-25 for the ready-made verifier
 `MoritzLaurer/DeBERTa-v3-base-mnli-fever-anli`): label accuracy 0.640, FEVER score 0.483, recall_set@10 0.660.
-`--verifier ours` runs the old checkpoint (0.51 / 0.38) into its own latest_n<N>_ours.json, without the baseline check. The test also requires `bm25.rm3: false`. The baseline is verifier-only on the old 175-shard index with no reranker,
+`--verifier <HF NLI model>` runs another verifier into its own latest_n<N>_<model>.json, without the baseline check. The test also requires `bm25.rm3: false`. The baseline is verifier-only on the old 175-shard index with no reranker,
 so with the reranker/aggregator/full index on, flips are expected: report the numbers next to the baseline. Otherwise a failure means the pipeline's
 behaviour changed (retrieval, evidence scoring or the verifier): say which number moved. Don't fix anything inside
 this skill. If `/fever-full-test` fails, offer `/fever-full-test 300` to see how big the change is.

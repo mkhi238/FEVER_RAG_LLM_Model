@@ -21,12 +21,9 @@ def test_env_override(monkeypatch, tmp_path):
 
 def test_label_mapping_matches_verifier_head():
   assert config.label_mapping == {"TRUE": 0, "FALSE": 1, "NOT ENOUGH INFO": 2}
-  assert config.num_labels == 3
 
 
 @pytest.mark.skipif(not config.artifacts_root.exists(), reason="artifacts drive not mounted")
 def test_artifacts_present():
   validate_config()
-  assert config.verifier_checkpoint.is_file()
   assert (config.retriever_index_dir / config.retriever_index_file).is_file()
-  assert config.verifier_training_data.is_file()

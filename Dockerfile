@@ -1,5 +1,5 @@
 # ClaimScan fact-check API (CPU). Code and Python deps only: the artifacts (FAISS index, BM25
-# index, sentence store, verifier checkpoint) and the HF model cache are mounted read-only at run time.
+# index, sentence store) and the HF model cache are mounted read-only at run time.
 #
 #   docker compose up --build                                # recommended, see docker-compose.yml
 #   docker build -t claimscan-api .                          # default: Java 21 + pyserini, for the hybrid retriever

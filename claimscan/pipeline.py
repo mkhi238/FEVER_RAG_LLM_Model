@@ -1,7 +1,7 @@
 """Retrieve -> score evidence -> verify, for one claim.
 
 Was rag/Inference/test_rag.py. The model, retriever and corpus used to be module
-globals set in ``__main__`` (or patched in by run_experiments.py); they now travel in
+globals set in ``__main__``; they now travel in
 a ``Services`` object from ``load_services()``. Decision logic is unchanged.
 The demo claim list moved to scripts/rag_demo.py.
 """
@@ -15,7 +15,7 @@ import torch
 
 from claimscan.config import ClaimScanConfig, config
 from claimscan.evidence.select import _lookup_text, get_evidence
-from claimscan.verifier.deberta_verifier import FEVERVerifier
+from claimscan.verifier.hf_nli import HFNLIVerifier
 
 log = logging.getLogger(__name__)
 LABEL_MAP = {0: "TRUE", 1: "FALSE", 2: "NOT ENOUGH INFO"}
@@ -23,23 +23,15 @@ LABEL_MAP = {0: "TRUE", 1: "FALSE", 2: "NOT ENOUGH INFO"}
 
 @dataclass
 class Services:
-  model: FEVERVerifier
+  model: HFNLIVerifier
   retriever: "FAISSRetriever | BM25Retriever | HybridRetriever"
   corpus_df: "pd.DataFrame | SentenceStore"   # SentenceStore: per-request lookup, used by the API
   reranker: "Reranker | None" = None          # rerank.backend in default.yaml; None = retriever order
 
 
-def load_verifier(cfg: ClaimScanConfig = config, name: str | None = None) -> FEVERVerifier:
-  """``name`` (default cfg.verifier_inference_model): "ours" = the trained checkpoint, else a HuggingFace NLI model."""
-  name = name or cfg.verifier_inference_model
-  if name != "ours":
-    from claimscan.verifier.hf_nli import HFNLIVerifier
-    return HFNLIVerifier(name, cfg.max_length).eval()
-  model = FEVERVerifier()
-  # map_location: checkpoint was saved on GPU; inference here runs on CPU as before
-  model.load_state_dict(torch.load(cfg.verifier_checkpoint, map_location="cpu"))
-  model.eval()
-  return model
+def load_verifier(cfg: ClaimScanConfig = config, name: str | None = None) -> HFNLIVerifier:
+  """The HuggingFace NLI model ``name`` (default cfg.verifier_inference_model) as the verifier."""
+  return HFNLIVerifier(name or cfg.verifier_inference_model, cfg.max_length).eval()
 
 
 def load_retriever(cfg: ClaimScanConfig = config, kind: str | None = None):

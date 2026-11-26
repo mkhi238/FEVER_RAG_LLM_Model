@@ -2,8 +2,8 @@ def pytest_addoption(parser):
   parser.addoption("--fever-claims", type=int, default=300,
                    help="claims for the fever_suite test (300 = full benchmark sample, 10 = fast slice)")
   parser.addoption("--verifier", default=None,
-                   help="verifier for the FEVER suite: default verifier.inference_model from the config; 'ours' "
-                        "(the trained checkpoint), a HuggingFace NLI model, or a path to a model.pt")
+                   help="verifier for the FEVER suite: default verifier.inference_model from the config, "
+                        "or another HuggingFace NLI model")
   parser.addoption("--aggregator", default="aggregator_dpo",
                    help="rear aggregator for the FEVER suite: an adapter dir under <artifacts>/models (default: the "
                         "trained DPO one) whose labels are scored, or 'none' for the verifier's labels")

@@ -61,11 +61,10 @@ uv pip install --python .venv/bin/python -r requirements-dev.txt
 uv pip install --python .venv/bin/python --no-deps -e .
 ```
 
-Data, indexes and the verifier checkpoint live outside the repo, under `artifacts_root` in `configs/default.yaml`. Override it with `CLAIMSCAN_ARTIFACTS=/path` (or a whole config with `CLAIMSCAN_CONFIG=/path/to.yaml`).
+Data and indexes live outside the repo, under `artifacts_root` in `configs/default.yaml`. Override it with `CLAIMSCAN_ARTIFACTS=/path` (or a whole config with `CLAIMSCAN_CONFIG=/path/to.yaml`).
 
 ```bash
 uvicorn claimscan.api.main:app            # POST /fact-check {"claim": "..."}, GET /health
-python scripts/verifier_smoke.py          # just the verifier
 python -m claimscan.eval.benchmark --n 300                 # compare all retrievers
 python -m claimscan.eval.fever_eval --max-claims 200       # end-to-end FEVER score
 python -m pytest -q
@@ -103,7 +102,7 @@ DeBERTa-v3 verifier, 3 epochs: training loss and train/validation accuracy. Take
 
 ## Known limits
 
-- **FEVER line 0 is stored as -1** (the HF loader turns the falsy 0 into -1), which is 46% of gold pairs. `claimscan/eval/gold.py` fixes it for eval; `verifier/prepare.py` doesn't, so the verifier was trained without that evidence.
+- **FEVER line 0 is stored as -1** (the HF loader turns the falsy 0 into -1), which is 46% of gold pairs. `claimscan/eval/gold.py` fixes it for eval; the old self-trained verifier (removed) was trained without that evidence.
 - The FAISS index covers only 17.1M of the 25.2M sentences (shards 0–174 of 253). It's 26 GB, so it's memory-mapped (`retriever.mmap`).
 - The verifier's 94–95% came from an unshuffled split. It says NEI with 0.995 confidence on "Obama was born in Hawaii".
 

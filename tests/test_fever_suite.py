@@ -1,7 +1,7 @@
 """FEVER claim suite: the shipped hybrid retriever (FAISS + BM25 without RM3, RRF; the benchmark's
 ``hybrid_norm3``) end to end on the 300-claim benchmark sample.
 
-Not part of the unit tests: it needs the artifacts (cached hits, gold, corpus, verifier checkpoint), so it is
+Not part of the unit tests: it needs the artifacts (cached hits, gold, corpus), so it is
 skipped by a plain `pytest` (tests/conftest.py) and run by naming the file:
 
     pytest tests/test_fever_suite.py --fever-claims 10   # quick (/fever, the default)
@@ -117,7 +117,7 @@ def suite(request):
   base = json.loads(BASELINE_FILE.read_text())
   if not 1 <= n <= len(base["predictions"]):
     pytest.fail(f"--fever-claims must be 1..{len(base['predictions'])}, got {n}")
-  for p in (cfg.verifier_output_dir, cfg.sentence_store):
+  for p in (cfg.sentence_store,):
     if not Path(p).exists():
       pytest.skip(f"artifact missing: {p}")
 
@@ -217,20 +217,10 @@ def test_suite_matches_baseline(suite):
 #
 #     pytest tests/test_fever_suite.py -k gold_evidence -s
 #
-#     pytest tests/test_fever_suite.py -k gold_evidence --verifier MoritzLaurer/DeBERTa-v3-base-mnli-fever-anli
-#     pytest tests/test_fever_suite.py -k gold_evidence --verifier <dir>/trained_model/model.pt   # another checkpoint
+#     pytest tests/test_fever_suite.py -k gold_evidence --verifier <another HuggingFace NLI model>
 #     add --gold-split train for 200 TRUE/FALSE train claims instead of the suite's (a leakage check)
 #
 # Writes <eval_dir>/fever_suite/latest_oracle.json (the config's verifier) or latest_oracle_<model>.json (another one).
-#     --verifier ours = the old trained checkpoint (57% with gold evidence).
-
-def _load_checkpoint(path: str):
-  """Our FEVERVerifier from another checkpoint (e.g. a retrained verifier/deberta_v2/trained_model/model.pt)."""
-  import torch
-  from claimscan.verifier.deberta_verifier import FEVERVerifier
-  model = FEVERVerifier()
-  model.load_state_dict(torch.load(path, map_location="cpu"))
-  return model.eval()
 
 
 @pytest.fixture(scope="module")
@@ -243,7 +233,7 @@ def gold_evidence_run(request):
   from claimscan.evidence.select import _lookup_text, index_corpus
   from claimscan.pipeline import load_verifier, verify
 
-  for p in (cfg.verifier_checkpoint, cfg.sentence_store):
+  for p in (cfg.sentence_store,):
     if not Path(p).exists():
       pytest.skip(f"artifact missing: {p}")
   base = json.loads(BASELINE_FILE.read_text())
@@ -275,7 +265,7 @@ def gold_evidence_run(request):
     corpus.reset_index().to_parquet(path)
   torch.set_num_threads(2)
   name = request.config.getoption("--verifier") or cfg.verifier_inference_model
-  model = _load_checkpoint(name) if name.endswith(".pt") else load_verifier(cfg, name)
+  model = load_verifier(cfg, name)
   predict = lambda claim, evidence: verify(model, claim, evidence)[0]
 
   t = time.perf_counter()
@@ -297,7 +287,7 @@ def gold_evidence_run(request):
             "accuracy_gold_evidence": acc("pred_gold_evidence"),
             "accuracy_suite_retrieved_evidence": acc("pred_suite") if split == "validation" else None,
             "wall_clock_s": round(time.perf_counter() - t, 1), "per_claim": rows}
-  tag = Path(name).parent.parent.name if name.endswith(".pt") else name.replace("/", "__")
+  tag = name.replace("/", "__")
   out_name = "latest_oracle.json" if name == cfg.verifier_inference_model else f"latest_oracle_{tag}.json"
   if split != "validation":
     out_name = out_name.replace(".json", f"_{split}.json")

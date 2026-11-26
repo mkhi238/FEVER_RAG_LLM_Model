@@ -46,18 +46,9 @@ class ClaimScanConfig:
   hybrid_candidates: int
 
   # verifier
-  verifier_model: str
   verifier_output_dir: Path
   verifier_training_data: Path
-  batch_size: int
-  learning_rate: float
-  num_epochs: int
   max_length: int
-  warmup_steps: int
-  negative_samples_per_claim: int
-  max_evidence_sentences: int
-  eval_batch_size: int
-  num_labels: int
 
   # tracking
   mlflow_experiment_name: str
@@ -97,8 +88,8 @@ class ClaimScanConfig:
   aggregator_timeout: float = 30.0
   aggregator_api_key_env: str = ""   # NAME of the env var holding the key; "" = local llama-server
 
-  # verifier used at inference: "ours" (verifier_checkpoint) or a HuggingFace NLI model name
-  verifier_inference_model: str = "ours"
+  # verifier: a HuggingFace NLI model name (claimscan/verifier/hf_nli.py)
+  verifier_inference_model: str = "MoritzLaurer/DeBERTa-v3-base-mnli-fever-anli"
   # TRUE/FALSE -> NEI when the verifier's P(NEI) >= this (None = off)
   verifier_nei_prob_threshold: float | None = None
 
@@ -114,10 +105,6 @@ class ClaimScanConfig:
   def sentence_store(self) -> Path:
     """The one FEVER SQLite file: sentences, claims, evidence (claimscan/data/fever_db.py builds it)."""
     return self.data_processed / "fever_sentences.sqlite"
-
-  @property
-  def verifier_checkpoint(self) -> Path:
-    return self.verifier_output_dir / "trained_model" / "model.pt"
 
   def dense_index(self, name: str | None = None) -> dict:
     name = name or self.default_dense_index
@@ -161,18 +148,9 @@ def load_config(path: str | os.PathLike | None = None) -> ClaimScanConfig:
     bm25_rm3=bool(bm25.get("rm3", True)),
     hybrid_rrf_k=int(hybrid.get("rrf_k", 60)),
     hybrid_candidates=int(hybrid.get("candidates", 100)),
-    verifier_model=v["model"],
     verifier_output_dir=p["verifier_output_dir"],
     verifier_training_data=p["verifier_training_data"],
-    batch_size=int(v["batch_size"]),
-    learning_rate=float(v["learning_rate"]),
-    num_epochs=int(v["num_epochs"]),
     max_length=int(v["max_length"]),
-    warmup_steps=int(v["warmup_steps"]),
-    negative_samples_per_claim=int(v["negative_samples_per_claim"]),
-    max_evidence_sentences=int(v["max_evidence_sentences"]),
-    eval_batch_size=int(v["eval_batch_size"]),
-    num_labels=int(v["num_labels"]),
     mlflow_experiment_name=raw["mlflow_experiment_name"],
     mlflow_tracking_uri=str(p["mlflow_tracking_uri"]),
     mlflow_artifact_dir=p.get("mlflow_artifact_dir", root / "mlflow/artifacts"),
@@ -199,7 +177,7 @@ def load_config(path: str | os.PathLike | None = None) -> ClaimScanConfig:
     aggregator_model=str(os.environ.get("CLAIMSCAN_AGGREGATOR_MODEL", ag.get("model", "gemma"))),
     aggregator_timeout=float(os.environ.get("CLAIMSCAN_AGGREGATOR_TIMEOUT", ag.get("timeout", 30.0))),
     aggregator_api_key_env=str(os.environ.get("CLAIMSCAN_AGGREGATOR_API_KEY_ENV", ag.get("api_key_env") or "")),
-    verifier_inference_model=str(v.get("inference_model", "ours")),
+    verifier_inference_model=str(v.get("inference_model", "MoritzLaurer/DeBERTa-v3-base-mnli-fever-anli")),
     verifier_nei_prob_threshold=(None if v.get("nei_prob_threshold") is None else float(v["nei_prob_threshold"])),
   )
 

@@ -39,7 +39,7 @@ Run with `nice -n 19` if the user's RL training may be on the machine. Don't add
 ## Notes
 
 - Test files: aggregation, aggregator_llm_output, api, benchmark, config, faiss_indexer, fever_metric, hybrid_retriever,
-  imports, instruct_model, posttrain_store, rear_aggregator, rerank, scoring, store, verifier_data (plus the deselected fever_suite).
+  imports, instruct_model, posttrain_store, rear_aggregator, rerank, scoring, store (plus the deselected fever_suite).
 - `claimscan/llm/` has no tests yet. `test_rear_aggregator.py` skips until `claimscan/instruct/rear_aggregator.py` exists.
 - Tests must not need the GPU or the 4 GB corpus. If one tries to load them, say so in the report.
 - `tests/test_fever_suite.py` (the FEVER claim suite) is deselected from a plain `pytest` by tests/conftest.py.

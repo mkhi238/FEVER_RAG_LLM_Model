@@ -16,8 +16,7 @@ MODULES = [
   "claimscan.eval",
   "claimscan.eval.gold",
   "claimscan.eval.fever_eval",
-  "claimscan.verifier.deberta_verifier",
-  "claimscan.verifier.train",
+  "claimscan.verifier.hf_nli",
   "claimscan.pipeline",
   "claimscan.api.schemas",
   "claimscan.api.deps",
@@ -42,7 +41,6 @@ NEEDS_FAISS = [
   "claimscan.eval.eval_retriever",
   "claimscan.eval.benchmark",
   "claimscan.tracking",
-  "claimscan.verifier.prepare",
 ]
 
 

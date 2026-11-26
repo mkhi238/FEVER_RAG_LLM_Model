@@ -4,7 +4,7 @@
 -r requirements.txt
 
 # --- training / data prep
-scikit-learn>=1.9.1             # verifier/train.py, scripts/run_experiments.py
+scikit-learn>=1.9.1             # archive/ scripts
 datasets>=5.2                   # claimscan/data/* (FEVER from the HF hub), vendored FEVER metric
 tqdm>=4.70
 

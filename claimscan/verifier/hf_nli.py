@@ -1,11 +1,11 @@
 """An off-the-shelf HuggingFace NLI model used as the verifier (e.g. MoritzLaurer/DeBERTa-v3-base-mnli-fever-anli).
 
-Same interface as FEVERVerifier, so pipeline.verify works unchanged:
+The only verifier; pipeline.verify uses this interface:
   encode_text(claim, evidence) -> encoding;  model(input_ids, attention_mask) -> logits in LABEL_MAP order
   (0 TRUE, 1 FALSE, 2 NOT ENOUGH INFO).
 NLI input is a pair: premise = the evidence sentences joined, hypothesis = the claim.
 Labels: entailment -> TRUE, contradiction -> FALSE, neutral -> NOT ENOUGH INFO.
-Chosen with verifier.inference_model in configs/default.yaml ("ours" = the trained FEVERVerifier checkpoint).
+Chosen with verifier.inference_model in configs/default.yaml.
 """
 import torch
 import torch.nn as nn

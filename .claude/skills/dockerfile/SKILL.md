@@ -9,7 +9,7 @@ description: Build, run, health-check and smoke-test the ClaimScan fact-check AP
 Adapted from [wrsmith108/docker-claude-skill](https://github.com/wrsmith108/docker-claude-skill) (pre-flight check,
 quick reference, `docker exec` without `-it`, wait-for-healthy script), rewritten for this Python/FastAPI project.
 The image holds code + Python packages only (CPU torch, Java 21 + pyserini). The artifacts (FAISS, BM25, sentence
-store, verifier) and the HF cache are mounted read-only. Details: `docker/README.md`.
+store) and the HF cache are mounted read-only. Details: `docker/README.md`.
 
 **Ship only what works.** Build from `main` or the `ship` branch (a clean checkout or the ship worktree), never from
 a branch with work in progress. `.dockerignore` is a whitelist (Dockerfile, requirements.txt,
@@ -27,8 +27,8 @@ ls /mnt/c/Users/*/AppData/Local/Docker/wsl/disk/docker_data.vhdx 2>/dev/null && 
 df -h /mnt/c | tail -1                                                                  # C: must not be the build target
 git branch --show-current; git status --short claimscan configs requirements.txt Dockerfile docker   # main/ship, clean
 A=$(sed -n 's/^artifacts_root:[[:space:]]*//p' configs/default.yaml | head -1)
-ls -d "$A/data/processed/fever_sentences.sqlite" "$A/dense/faiss_bge_small_en_v1_5" "$A/sparse/bm25_sentences/index" "$A/verifier"
-ls -d /mnt/d/huggingface_cache/hub/models--BAAI--bge-small-en-v1.5 /mnt/d/huggingface_cache/hub/models--microsoft--deberta-v3-base
+ls -d "$A/data/processed/fever_sentences.sqlite" "$A/dense/faiss_bge_small_en_v1_5" "$A/sparse/bm25_sentences/index"
+ls -d /mnt/d/huggingface_cache/hub/models--BAAI--bge-small-en-v1.5 /mnt/d/huggingface_cache/hub/models--MoritzLaurer--DeBERTa-v3-base-mnli-fever-anli
 ```
 
 - **Docker disk on C:** stop. The repo's hard rule is nothing on C:. Docker Desktop → Settings → Resources →
@@ -100,7 +100,7 @@ accuracy (`/fever-full-test 300`).
 | `docker: command not found` in WSL | Docker Desktop → Settings → Resources → WSL Integration → enable Ubuntu. Don't use `docker.exe` from WSL: it can't read `/mnt/d` bind mounts. |
 | Container exits or is OOM-killed while loading | The WSL VM needs ~4.5 GB for `hybrid` (BM25's JVM ~2.5 GB). Raise the VM memory, or run `CLAIMSCAN_RETRIEVER=faiss`. |
 | `fever_sentences.sqlite missing` in the logs | Build the sentence store (pre-flight). |
-| `OSError ... offline mode` / model not found | The HF cache mount is missing a model. Check `HF_CACHE_HOST` has bge-small-en-v1.5 and deberta-v3-base under `hub/`. |
+| `OSError ... offline mode` / model not found | The HF cache mount is missing a model. Check `HF_CACHE_HOST` has bge-small-en-v1.5 and DeBERTa-v3-base-mnli-fever-anli under `hub/`. |
 | `JavaException` / pyserini import error | The image was built with `WITH_BM25=0` but is running hybrid/bm25. Rebuild with the default, or run faiss. |
 | First request takes 10-30 s | Normal: the FAISS/BM25 indexes are paging in from D:. Later requests take a few seconds. |
 | Port 8000 in use | `API_PORT=8001 docker compose up -d api` (and `docker-health.sh 420 8001`) |

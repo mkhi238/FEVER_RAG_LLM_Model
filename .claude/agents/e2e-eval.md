@@ -38,8 +38,7 @@ python scripts/e2e_cpu_eval.py [--per-label 3] [--retrievers faiss hybrid] [--no
    but not in the 3 evidence sentences), verifier errors (wrong even on gold evidence), and NEI handling
    (NEI claims forced to TRUE/FALSE). Say which stage is the bottleneck.
 4. **Change vs the previous run** in the results folder, if there is one.
-5. **What to fix**, ranked, citing `file:line`. Known issues (don't re-discover them as new): verifier line-0
-   training bug (`verifier/prepare.py`), FEVER claims and corpus are lowercased, reranker not wired into
+5. **What to fix**, ranked, citing `file:line`. Known issues (don't re-discover them as new): FEVER claims and corpus are lowercased, reranker not wired into
    `pipeline.py`, API uses k=10 / 0.55 vs pipeline k=30 / 0.5, `load_services()` loads the full corpus into RAM.
 6. Anything that crashed, with the traceback, and anything you skipped and why.
 
