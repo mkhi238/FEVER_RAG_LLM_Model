@@ -55,10 +55,12 @@ args_dpo = DPOConfig(
 )
 
 trainer = DPOTrainer(
-    model=sft_model,   # PEFT model: the reference is the same model with the adapter off, so no 2nd copy in VRAM
+    model=sft_model,   # PEFT model with the SFT adapter: TRL copies it into a frozen "ref" adapter = the reference (SFT model), no 2nd base in VRAM
     train_dataset=dataset_dpo,
     args=args_dpo,
 )
+# Without "ref", TRL would fall back to the base model (adapters off) as the reference.
+assert "ref" in trainer.model.peft_config, "DPO reference is not the SFT model"
 trainer.train()
 trainer.save_model()
 
