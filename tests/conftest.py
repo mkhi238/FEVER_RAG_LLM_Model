@@ -7,6 +7,8 @@ def pytest_addoption(parser):
   parser.addoption("--aggregator", default="aggregator_dpo",
                    help="rear aggregator for the FEVER suite: an adapter dir under <artifacts>/models (default: the "
                         "trained DPO one) whose labels are scored, or 'none' for the verifier's labels")
+  parser.addoption("--natlog-claims", type=int, default=10,
+                   help="claims for the natlog suite (tests/test_natlog_suite.py; a label-balanced slice of the 300)")
   parser.addoption("--gold-split", default="validation", choices=["validation", "train"],
                    help="claims for the gold-evidence test: 'validation' (the suite's) or 200 TRUE/FALSE train claims")
 
@@ -19,7 +21,8 @@ def _deselect(config, items, marker):
 
 
 def pytest_collection_modifyitems(config, items):
-  """The slow FEVER suite runs only when tests/test_fever_suite.py is named (or with -m fever_suite).
+  """The slow FEVER suite runs only when tests/test_fever_suite.py is named (or with -m fever_suite), the natlog
+  suite only when tests/test_natlog_suite.py is named (or with -m natlog_suite).
   Its gold-evidence measurement (~200 claims) is not part of /fever: it runs only when
   asked for with -k gold_evidence or -m gold_evidence."""
   asked = (config.getoption("-k") or "") + " " + (config.getoption("-m") or "")
@@ -27,6 +30,8 @@ def pytest_collection_modifyitems(config, items):
     _deselect(config, items, "gold_evidence")
   if not (any("test_fever_suite" in a for a in config.args) or "fever_suite" in (config.getoption("-m") or "")):
     _deselect(config, items, "fever_suite")
+  if not (any("test_natlog_suite" in a for a in config.args) or "natlog_suite" in (config.getoption("-m") or "")):
+    _deselect(config, items, "natlog_suite")
 
 
 import pytest  # noqa: E402

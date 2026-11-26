@@ -27,4 +27,5 @@ addopts = "--capture=sys"
 markers = [
   "fever_suite: end-to-end FEVER claim suite on the artifacts (deselected by default)",
   "gold_evidence: verifier-with-gold-evidence measurement (only with -k/-m gold_evidence)",
+  "natlog_suite: natural-logic verifier on FEVER claims, on the artifacts (deselected by default)",
 ]

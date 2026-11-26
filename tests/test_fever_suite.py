@@ -106,20 +106,12 @@ def _aggregator(cfg, name: str, records: list):
   return decide
 
 
-@pytest.fixture(scope="module")
-def suite(request):
-  pd = pytest.importorskip("pandas")
-  from claimscan.config import config as cfg
-  from claimscan.eval import benchmark as B
+def suite_hits(cfg, B, base, n: int):
+  """The baseline's claim sample with its cached FAISS + BM25 hits, fused as the benchmark does (missing caches are
+  rebuilt once). Returns (claims, fused, all_fused, gold, index_tag): ``claims`` = the n-claim label-balanced slice
+  (all 300 when n = 300), ``fused`` = their hits, ``all_fused`` = the hits of all 300."""
+  import pandas as pd
   from claimscan.eval.gold import load_gold_sets
-
-  n = request.config.getoption("--fever-claims")
-  base = json.loads(BASELINE_FILE.read_text())
-  if not 1 <= n <= len(base["predictions"]):
-    pytest.fail(f"--fever-claims must be 1..{len(base['predictions'])}, got {n}")
-  for p in (cfg.sentence_store,):
-    if not Path(p).exists():
-      pytest.skip(f"artifact missing: {p}")
 
   cache = Path(cfg.eval_dir) / "cache"
   claims_file = cache / base["claims_file"]
@@ -149,6 +141,24 @@ def suite(request):
   ids = [int(i) for i in claims["id"]]
   fused = {i: all_fused[i] for i in ids}
   gold = load_gold_sets(claims["id"])
+  return claims, fused, all_fused, gold, index_tag
+
+
+@pytest.fixture(scope="module")
+def suite(request):
+  pd = pytest.importorskip("pandas")
+  from claimscan.config import config as cfg
+  from claimscan.eval import benchmark as B
+
+  n = request.config.getoption("--fever-claims")
+  base = json.loads(BASELINE_FILE.read_text())
+  if not 1 <= n <= len(base["predictions"]):
+    pytest.fail(f"--fever-claims must be 1..{len(base['predictions'])}, got {n}")
+  for p in (cfg.sentence_store,):
+    if not Path(p).exists():
+      pytest.skip(f"artifact missing: {p}")
+  claims, fused, all_fused, gold, index_tag = suite_hits(cfg, B, base, n)
+  ids = [int(i) for i in claims["id"]]
 
   t = time.perf_counter()
   retrieval = B.retrieval_metrics(fused, gold)
