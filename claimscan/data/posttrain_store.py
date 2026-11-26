@@ -1,8 +1,9 @@
-"""Post-training data in one SQLite table, `sft_examples`, and the TRL loader posttraining.py uses.
+"""Post-training data in SQLite (`sft_examples` for SFT, `dpo_examples` for DPO) and the TRL loaders posttraining.py uses.
 
     python -m claimscan.data.posttrain_store context    # VitaminC, HoVer, LIAR2, UltraFeedback (minutes)
     python -m claimscan.data.posttrain_store verify     # aggregator rows: VitaminC + SufficientFacts through the verifier (CPU)
     python -m claimscan.data.posttrain_store fever      # aggregator rows: FEVER train claims through the full pipeline (CPU, ~3 h)
+    python -m claimscan.data.posttrain_store dpo        # dpo_examples: UltraFeedback preference pairs (minutes)
 
 sft_examples (source, ref, system, user, assistant): one finished chat example per row. Sources:
   agg_*          the rear aggregator's task: its exact prompt (rear_aggregator.build_messages) -> VetoOutput JSON.
@@ -11,7 +12,8 @@ sft_examples (source, ref, system, user, assistant): one finished chat example p
   vitaminc       claim + evidence -> TRUE / FALSE / NOT ENOUGH INFO
   hover          multi-hop claim + its evidence from our Wikipedia SQLite -> SUPPORTED / NOT SUPPORTED
   liar           statement + fact-checker summary -> one of LIAR's 6 ratings
-  ultrafeedback  general instructions -> the preferred answer (alignment)
+  ultrafeedback  general instructions -> the preferred answer (kept, but load_sft_dataset skips it: it is DPO data)
+dpo_examples (source, ref, prompt, chosen, rejected): ultrafeedback = UltraFeedback train_prefs pairs (alignment).
 Each builder replaces its own sources, except fever, which resumes. Downloads go to the HF cache (on D:).
 """
 import json
@@ -49,6 +51,7 @@ def _hf(repo, file):
 def _connect():
   con = sqlite3.connect(DB)
   con.execute("CREATE TABLE IF NOT EXISTS sft_examples (source TEXT, ref TEXT, system TEXT, user TEXT, assistant TEXT)")
+  con.execute("CREATE TABLE IF NOT EXISTS dpo_examples (source TEXT, ref TEXT, prompt TEXT, chosen TEXT, rejected TEXT)")
   return con
 
 
@@ -117,6 +120,23 @@ def build_ultrafeedback(con, n, max_chars=3000):
       if len(rows) == n:
         break
   _replace(con, "ultrafeedback", rows)
+
+
+def build_ultrafeedback_dpo(con, n, max_chars=3000):
+  """Preference pairs for DPO: single-turn instruction, preferred answer, rejected answer (dpo_examples table)."""
+  d = _hf("HuggingFaceH4/ultrafeedback_binarized", "default/train_prefs/0000.parquet").sample(frac=1, random_state=0)
+  rows = []
+  for r in d.itertuples(index=False):
+    c, j = list(r.chosen), list(r.rejected)
+    if (len(c) == len(j) == 2 and c[0]["role"] == "user" and c[1]["role"] == j[1]["role"] == "assistant"
+        and max(len(c[1]["content"]), len(j[1]["content"])) <= max_chars):
+      rows.append(("ultrafeedback", r.prompt_id, c[0]["content"], c[1]["content"], j[1]["content"]))
+      if len(rows) == n:
+        break
+  con.execute("DELETE FROM dpo_examples WHERE source = 'ultrafeedback'")
+  con.executemany("INSERT INTO dpo_examples VALUES (?, ?, ?, ?, ?)", rows)
+  con.commit()
+  print(f"dpo ultrafeedback: {len(rows):,} pairs")
 
 
 # ---------- aggregator ----------
@@ -202,8 +222,8 @@ def load_sft_dataset(limit=None):
   """Every row as {"prompt": [system?, user], "completion": [assistant]}, shuffled. limit = first N rows."""
   from datasets import Dataset
 
-  with sqlite3.connect(DB) as con:
-    df = pd.read_sql_query("SELECT * FROM sft_examples ORDER BY RANDOM()", con)
+  with sqlite3.connect(DB) as con:   # ultrafeedback is for DPO (load_dpo_dataset), not SFT
+    df = pd.read_sql_query("SELECT * FROM sft_examples WHERE source != 'ultrafeedback' ORDER BY RANDOM()", con)
   if limit:
     df = df.head(limit)
 
@@ -215,6 +235,21 @@ def load_sft_dataset(limit=None):
       "completion": [{"role": "assistant", "content": assistant}],
     })
   return Dataset.from_list(rows)
+
+
+def load_dpo_dataset(limit=None):
+  """Every dpo_examples row as {"prompt": [user], "chosen": [assistant], "rejected": [assistant]}, shuffled."""
+  from datasets import Dataset
+
+  with sqlite3.connect(DB) as con:
+    df = pd.read_sql_query("SELECT * FROM dpo_examples ORDER BY RANDOM()", con)
+  if limit:
+    df = df.head(limit)
+  return Dataset.from_list([{
+    "prompt": [{"role": "user", "content": p}],
+    "chosen": [{"role": "assistant", "content": c}],
+    "rejected": [{"role": "assistant", "content": r}],
+  } for p, c, r in zip(df.prompt, df.chosen, df.rejected)])
 
 
 if __name__ == "__main__":
@@ -229,5 +264,7 @@ if __name__ == "__main__":
       build_verified(con, 2000)
     elif cmd == ["fever"]:
       build_fever(con, 5000)
+    elif cmd == ["dpo"]:
+      build_ultrafeedback_dpo(con, 5000)
     else:
       print(__doc__)

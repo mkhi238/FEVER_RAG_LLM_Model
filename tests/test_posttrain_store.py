@@ -68,9 +68,24 @@ def test_load_sft_dataset_rows(con):
   con.execute("INSERT INTO sft_examples VALUES ('ultrafeedback', 'x', NULL, 'say hi', 'hi')")
   con.commit()
   ds = P.load_sft_dataset()
-  assert len(ds) == 5
-  by_user = {r["prompt"][-1]["content"]: r for r in ds}
-  assert [m["role"] for m in by_user["say hi"]["prompt"]] == ["user"]   # no system prompt -> user only
+  assert len(ds) == 4   # the ultrafeedback row is DPO data, so SFT skips it
+  assert "say hi" not in {r["prompt"][-1]["content"] for r in ds}
   agg = next(r for r in ds if len(r["prompt"]) == 2)
   out = json.loads(agg["completion"][0]["content"])
   assert set(out) == {"veto", "veto_reason", "explanation", "llm_confidence"}
+
+
+def test_ultrafeedback_dpo_pairs(con, monkeypatch):
+  pytest.importorskip("datasets")
+  u = lambda t: {"role": "user", "content": t}
+  a = lambda t: {"role": "assistant", "content": t}
+  prefs = pd.DataFrame({"prompt_id": ["p1", "p2"],
+                        "chosen": [[u("say hi"), a("hi!")], [u("multi"), a("x"), u("again"), a("y")]],
+                        "rejected": [[u("say hi"), a("go away")], [u("multi"), a("z"), u("again"), a("w")]]})
+  monkeypatch.setattr(P, "_hf", lambda repo, file: prefs.copy())
+  P.build_ultrafeedback_dpo(con, 10)
+  P.build_ultrafeedback_dpo(con, 10)   # rerun replaces, doesn't duplicate
+  ds = P.load_dpo_dataset()
+  assert len(ds) == 1   # the multi-turn pair is skipped
+  r = ds[0]
+  assert r["prompt"] == [u("say hi")] and r["chosen"] == [a("hi!")] and r["rejected"] == [a("go away")]
