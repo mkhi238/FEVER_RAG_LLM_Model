@@ -200,8 +200,9 @@ def api_with(monkeypatch, llm_from):
 
 @needs_aggregate
 def test_api_returns_llm_fields(api_with):
-  # logits [1, 0, 0] -> TRUE at 0.576: above the pipeline's 0.5 NEI threshold, below the veto's 0.6
-  client, _ = api_with([1.0, 0.0, 0.0], completion(veto_json(veto=True, conf=0.95)))
+  # logits [1, 0.6, -1] -> TRUE 0.554, NEI 0.075: above the pipeline's 0.5 threshold, below the veto's 0.6,
+  # and P(NEI) under verifier.nei_prob_threshold (0.2)
+  client, _ = api_with([1.0, 0.6, -1.0], completion(veto_json(veto=True, conf=0.95)))
   with client:
     r = client.post("/fact-check", json={"claim": CLAIM})
   assert r.status_code == 200
