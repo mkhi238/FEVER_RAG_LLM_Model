@@ -25,8 +25,12 @@ def load_reranker(cfg=config, backend: str | None = None) -> Reranker | None:
     return CohereReranker(cfg.rerank_cohere_model, base_url=cfg.rerank_cohere_base_url)
   if backend == "openai":
     from claimscan.rerank.openai_llm import OpenAIReranker
-    return OpenAIReranker(cfg.rerank_openai_model, base_url=cfg.rerank_openai_base_url,
-                          mode=cfg.rerank_openai_mode, batch_size=cfg.rerank_batch_size)
+    model = cfg.rerank_openai_model
+    # reasoning models (gpt-5*, o1/o3/o4*) reject temperature and need room for hidden reasoning tokens
+    reasoning = model.startswith(("gpt-5", "o1", "o3", "o4"))
+    extra = dict(temperature=None, max_tokens=1024, max_tokens_field="max_completion_tokens") if reasoning else {}
+    return OpenAIReranker(model, base_url=cfg.rerank_openai_base_url,
+                          mode=cfg.rerank_openai_mode, batch_size=cfg.rerank_batch_size, **extra)
   if backend == "llamacpp":
     from claimscan.rerank.llamacpp import LlamaCppReranker
     return LlamaCppReranker()

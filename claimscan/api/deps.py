@@ -26,7 +26,9 @@ def load_aggregator(cfg=config):
 
 def load_services(cfg=config) -> Services:
   from claimscan.evidence.store import SentenceStore
-  return Services(model=load_verifier(cfg), retriever=load_retriever(cfg), corpus_df=SentenceStore(cfg.sentence_store))
+  from claimscan.rerank import load_reranker
+  return Services(model=load_verifier(cfg), retriever=load_retriever(cfg), corpus_df=SentenceStore(cfg.sentence_store),
+                  reranker=load_reranker(cfg))
 
 
 class ModelService:

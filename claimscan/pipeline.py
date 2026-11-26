@@ -7,6 +7,7 @@ The demo claim list moved to scripts/rag_demo.py.
 """
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass, field
 
 import pandas as pd
@@ -16,6 +17,7 @@ from claimscan.config import ClaimScanConfig, config
 from claimscan.evidence.select import _lookup_text, get_evidence
 from claimscan.verifier.deberta_verifier import FEVERVerifier
 
+log = logging.getLogger(__name__)
 LABEL_MAP = {0: "TRUE", 1: "FALSE", 2: "NOT ENOUGH INFO"}
 
 
@@ -24,6 +26,7 @@ class Services:
   model: FEVERVerifier
   retriever: "FAISSRetriever | BM25Retriever | HybridRetriever"
   corpus_df: "pd.DataFrame | SentenceStore"   # SentenceStore: per-request lookup, used by the API
+  reranker: "Reranker | None" = None          # rerank.backend in default.yaml; None = retriever order
 
 
 def load_verifier(cfg: ClaimScanConfig = config, name: str | None = None) -> FEVERVerifier:
@@ -67,7 +70,9 @@ def load_services(cfg: ClaimScanConfig = config) -> Services:
   model = load_verifier(cfg)
   retriever = load_retriever(cfg)
   from claimscan.evidence.store import SentenceStore
-  return Services(model=model, retriever=retriever, corpus_df=SentenceStore(cfg.sentence_store))
+  from claimscan.rerank import load_reranker
+  return Services(model=model, retriever=retriever, corpus_df=SentenceStore(cfg.sentence_store),
+                  reranker=load_reranker(cfg))
 
 
 def verify(model, claim, evidence):
@@ -131,16 +136,29 @@ class Verdict:
   hits: list = field(default_factory=list)
 
 
+def _rerank(reranker, claim, hits, corpus, k):
+  """Reorder hits with the reranker, keep the top ``min(k, rerank.top_n)``. Fails open: on error, retriever order."""
+  from claimscan.rerank import rerank_hits
+  try:
+    return rerank_hits(reranker, claim, hits, corpus, top_n=min(k, config.rerank_top_n))
+  except Exception as e:
+    log.warning("reranker failed, keeping retriever order: %r", e)
+    return hits[:k]
+
+
 def fact_check_detailed(claim, services: Services, k=30, conf_threshold=0.5) -> Verdict:
   """The evaluated decision logic, with everything the API needs to show its work.
 
   ``services.corpus_df`` is a corpus DataFrame (raw or ``index_corpus``-ed) or anything with a
   ``for_hits(hits)`` method returning one, such as ``claimscan.evidence.store.SentenceStore``.
   """
-  evidence_results = services.retriever.search(claim, k=k)
+  reranker = getattr(services, "reranker", None)
+  evidence_results = services.retriever.search(claim, k=config.rerank_candidates if reranker else k)
   corpus = services.corpus_df
   if hasattr(corpus, "for_hits"):
     corpus = corpus.for_hits(evidence_results)
+  if reranker is not None:
+    evidence_results = _rerank(reranker, claim, evidence_results, corpus, k)
   picked = get_evidence(claim, evidence_results, corpus, with_ids=True)
   evidence = [text for text, _ in picked]
   hits = [{"rank": r, "id": h["id"], "line": int(h["line"]), "docid": f"{h['id']}#{h['line']}",

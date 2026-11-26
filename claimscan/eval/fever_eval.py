@@ -72,8 +72,9 @@ def evaluate_pipeline(max_claims=200, retriever=None, k=30, conf_threshold=0.5, 
     from claimscan.evidence.store import SentenceStore
     print("[fever] loading verifier, retriever, sentence store...")
     corpus = SentenceStore(config.sentence_store)
+    from claimscan.rerank import load_reranker
     services = Services(model=load_verifier(config), retriever=load_retriever(config, retriever),
-                        corpus_df=corpus)
+                        corpus_df=corpus, reranker=load_reranker(config))
 
   metric = load_fever_metric()
   preds, refs = [], []

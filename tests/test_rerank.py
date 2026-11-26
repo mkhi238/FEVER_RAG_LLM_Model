@@ -20,9 +20,11 @@ def test_sort_scores():
   assert sort_scores([1, 1, 2], top_n=2) == [(2, 2.0), (0, 1.0)]
 
 
-def test_config_default_is_none():
-  assert config.rerank_backend == "none"
-  assert load_reranker(config) is None
+def test_config_default_is_openai():
+  assert config.rerank_backend == "openai"
+  rr = load_reranker(config)
+  assert rr.model == "gpt-5-nano" and rr.temperature is None and rr.max_tokens_field == "max_completion_tokens"
+  assert load_reranker(config, backend="none") is None
 
 
 def test_old_config_without_rerank_section(tmp_path):

@@ -49,12 +49,13 @@ hybrid:
   rrf_k: 60
   candidates: 100      # hits taken from each retriever before fusing
 
-# Reranker over the retrieved candidates (not wired into pipeline.py yet).
+# Reranker over the retrieved candidates, in pipeline.fact_check_detailed (API + fever_eval): retrieve `candidates`,
+# rerank, keep the top min(k, top_n). Fails open to retriever order if the call errors (e.g. no API key).
 # backend: none | cross_encoder | cohere | openai | llamacpp
 #   cohere needs env COHERE_API_KEY; openai needs OPENAI_API_KEY (or point openai_base_url at a local chat server);
 #   llamacpp needs claimscan.llm.client.rerank finished. Notes: notes/reranker_research.md
 rerank:
-  backend: none
+  backend: openai
   top_n: 10                 # sentences kept after reranking
   candidates: 100           # retrieved hits fed to the reranker
   batch_size: 32            # cross_encoder batch / openai parallel requests
