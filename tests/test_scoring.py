@@ -118,3 +118,30 @@ def test_get_evidence_ids_and_indexed_corpus_match_scan():
   assert scanned[0] == ("tokyo is the capital of japan", "Tokyo#0") and len(scanned) == 2
   assert get_evidence("tokyo capital japan", hits, index_corpus(corpus), with_ids=True) == scanned
   assert get_evidence("tokyo capital japan", hits, corpus) == [t for t, _ in scanned]
+
+
+@pytest.mark.parametrize("probs, cut, label, downgraded", [
+  ([0.70, 0.05, 0.25], 0.2, "NOT ENOUGH INFO", True),    # P(NEI) 0.25 >= 0.2 -> NEI
+  ([0.85, 0.05, 0.10], 0.2, "TRUE", False),              # P(NEI) below the cut-off
+  ([0.70, 0.05, 0.25], None, "TRUE", False),             # rule off
+  ([0.10, 0.20, 0.70], 0.2, "NOT ENOUGH INFO", False),   # already NEI: not a downgrade
+])
+def test_nei_prob_threshold(monkeypatch, probs, cut, label, downgraded):
+  import torch
+  from claimscan import pipeline
+  monkeypatch.setattr(pipeline.config, "verifier_nei_prob_threshold", cut)
+  monkeypatch.setattr(pipeline, "get_evidence", lambda *a, **kw: [("a sentence", "A#0")])
+  monkeypatch.setattr(pipeline, "verify", lambda m, c, e: (pipeline.LABEL_MAP[int(torch.tensor(probs).argmax())],
+                                                           torch.tensor(probs)))
+  class Retriever:
+    def search(self, q, k):
+      return [{"id": "A", "line": 0, "score": 1.0}]
+  import pandas as pd
+  corpus = pd.DataFrame({"id": ["A"], "line": [0], "text": ["a sentence"]}).set_index(["id", "line"])
+  v = pipeline.fact_check_detailed("claim", pipeline.Services(model=None, retriever=Retriever(), corpus_df=corpus))
+  assert (v.label, v.downgraded) == (label, downgraded)
+
+
+def test_config_nei_prob_threshold_default():
+  from claimscan.config import config
+  assert config.verifier_nei_prob_threshold == 0.2

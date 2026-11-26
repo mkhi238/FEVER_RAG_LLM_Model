@@ -99,6 +99,8 @@ class ClaimScanConfig:
 
   # verifier used at inference: "ours" (verifier_checkpoint) or a HuggingFace NLI model name
   verifier_inference_model: str = "ours"
+  # TRUE/FALSE -> NEI when the verifier's P(NEI) >= this (None = off)
+  verifier_nei_prob_threshold: float | None = None
 
   @property
   def bm25_index_dir(self) -> Path:
@@ -198,6 +200,7 @@ def load_config(path: str | os.PathLike | None = None) -> ClaimScanConfig:
     aggregator_timeout=float(os.environ.get("CLAIMSCAN_AGGREGATOR_TIMEOUT", ag.get("timeout", 30.0))),
     aggregator_api_key_env=str(os.environ.get("CLAIMSCAN_AGGREGATOR_API_KEY_ENV", ag.get("api_key_env") or "")),
     verifier_inference_model=str(v.get("inference_model", "ours")),
+    verifier_nei_prob_threshold=(None if v.get("nei_prob_threshold") is None else float(v["nei_prob_threshold"])),
   )
 
   # Must happen before transformers / sentence_transformers are imported.

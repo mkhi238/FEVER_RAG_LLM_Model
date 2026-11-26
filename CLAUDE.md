@@ -46,6 +46,8 @@ python scripts/verifier_smoke.py
   copies its SFT targets (llm_confidence always 0.95/0.05, so the >= 0.9 gate never filters). Replies: `<artifacts>/eval/fever_suite/agg_responses_n300.jsonl`.
   Why 0.65 (same run): per gold label the verifier gets TRUE 91%, FALSE 76%, NEI 28%; 72 of the 105 errors are NEI claims called
   TRUE/FALSE (50 with conf >= 0.9), and in samples several are really supported by the retrieved sentences (FEVER NEI label noise).
+  NEI rule (default since 2026-11-26): `verifier.nei_prob_threshold: 0.2` (P(NEI) >= 0.2 -> NEI) gives 0.670 on the same run
+  (chosen on these 300 claims; median P(NEI) is only 0.08 on gold-NEI claims). User's view: the rest is data (retriever + verifier); scale up at the hackathon.
   Retrieval isn't the limit: full gold set sent for 131/200 TRUE/FALSE claims, verifier right on 85% of those.
   The full index is slow cold through the API (30-110 s per FAISS query from D:); the eval's batch search is fine.
 - Rear aggregator veto: OFF since 2026-11-26 (`rear_aggregator.VETO_ENABLED = False`; the LLM only explains). When on, the gate in
