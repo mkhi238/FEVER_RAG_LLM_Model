@@ -1,4 +1,4 @@
-"""Reranker interface shared by every backend (cohere, openai, cross_encoder, llamacpp).
+"""Reranker interface shared by every backend (cohere, openai, cross_encoder).
 
 Contract: ``rerank(query, docs, top_n)`` returns ``[(doc_index, score), ...]`` sorted by
 score descending (higher = more relevant), cut to ``top_n`` if given. ``doc_index`` points

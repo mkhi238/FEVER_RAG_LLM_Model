@@ -51,16 +51,16 @@ hybrid:
 
 # Reranker over the retrieved candidates, in pipeline.fact_check_detailed (API + fever_eval): retrieve `candidates`,
 # rerank, keep the top min(k, top_n). Fails open to retriever order if the call errors (e.g. no API key).
-# backend: none | cross_encoder | cohere | openai | llamacpp
+# backend: none | cross_encoder | cohere | openai
 #   cohere needs env COHERE_API_KEY; openai needs OPENAI_API_KEY (or point openai_base_url at a local chat server);
-#   llamacpp needs claimscan.llm.client.rerank finished. Notes: notes/reranker_research.md
+#   Notes: notes/reranker_research.md
 rerank:
-  backend: openai
+  backend: cohere           # key: COHERE_API_KEY in the repo-root .env (loaded by scripts/env.sh)
   top_n: 10                 # sentences kept after reranking
   candidates: 100           # retrieved hits fed to the reranker
   batch_size: 32            # cross_encoder batch / openai parallel requests
   device: cpu               # cross_encoder only
-  cross_encoder_model: cross-encoder/ms-marco-MiniLM-L-6-v2
+  cross_encoder_model: BAAI/bge-reranker-v2-m3   # 568M; was cross-encoder/ms-marco-MiniLM-L-6-v2
   cohere_model: rerank-v3.5
   cohere_base_url: https://api.cohere.com
   openai_model: gpt-5-nano

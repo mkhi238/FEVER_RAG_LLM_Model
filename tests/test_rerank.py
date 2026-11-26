@@ -9,7 +9,6 @@ from claimscan.rerank import load_reranker
 from claimscan.rerank.base import Reranker, rerank_hits, sort_scores
 from claimscan.rerank.cohere import CohereReranker
 from claimscan.rerank.cross_encoder import CrossEncoderReranker
-from claimscan.rerank.llamacpp import LlamaCppReranker
 from claimscan.rerank.openai_llm import OpenAIReranker, parse_ranking, parse_score
 
 DOCS = ["alpha", "beta", "gamma"]
@@ -20,11 +19,14 @@ def test_sort_scores():
   assert sort_scores([1, 1, 2], top_n=2) == [(2, 2.0), (0, 1.0)]
 
 
-def test_config_default_is_openai():
-  assert config.rerank_backend == "openai"
-  rr = load_reranker(config)
-  assert rr.model == "gpt-5-nano" and rr.temperature is None and rr.max_tokens_field == "max_completion_tokens"
+def test_config_default_is_cohere():
+  assert config.rerank_backend == "cohere"
+  assert isinstance(load_reranker(config), CohereReranker)   # no network until rerank() is called
+  local = load_reranker(config, backend="cross_encoder")   # lazy: the model is only downloaded/loaded on first rerank
+  assert isinstance(local, CrossEncoderReranker) and local.model_name == "BAAI/bge-reranker-v2-m3"
   assert load_reranker(config, backend="none") is None
+  gpt = load_reranker(config, backend="openai")   # reasoning-model request settings for gpt-5-nano
+  assert gpt.temperature is None and gpt.max_tokens_field == "max_completion_tokens"
 
 
 def test_old_config_without_rerank_section(tmp_path):
@@ -40,7 +42,6 @@ def test_old_config_without_rerank_section(tmp_path):
 def test_load_reranker_backends():
   assert isinstance(load_reranker(backend="cohere"), CohereReranker)
   assert isinstance(load_reranker(backend="openai"), OpenAIReranker)
-  assert isinstance(load_reranker(backend="llamacpp"), LlamaCppReranker)
   assert isinstance(load_reranker(backend="cross_encoder"), CrossEncoderReranker)  # lazy: no download
   with pytest.raises(ValueError):
     load_reranker(backend="bogus")
@@ -147,12 +148,6 @@ def test_cross_encoder_stub():
 
   rr = CrossEncoderReranker(model_obj=Stub())
   assert rr.rerank("q", ["a", "ccc", "bb"], top_n=2) == [(1, 3.0), (2, 2.0)]
-
-
-def test_llamacpp_stub(monkeypatch):
-  import claimscan.llm.client as client
-  monkeypatch.setattr(client, "rerank", lambda q, d, top_n=None: [(0, 0.1), (2, 0.8)])
-  assert LlamaCppReranker().rerank("q", DOCS, top_n=2) == [(2, 0.8), (0, 0.1)]
 
 
 class StubReranker(Reranker):

@@ -16,7 +16,7 @@ class CohereReranker(Reranker):
 
   def __init__(self, model: str = "rerank-v3.5", base_url: str = "https://api.cohere.com",
                api_key: str | None = None, timeout: float = 60.0, max_retries: int = 3,
-               transport=None, sleep=time.sleep):
+               transport=None, sleep=time.sleep, min_interval: float = 6.0):
     self.model = model
     self.url = base_url.rstrip("/") + "/v2/rerank"
     self._api_key = api_key
@@ -24,6 +24,7 @@ class CohereReranker(Reranker):
     self.max_retries = max_retries
     self._transport = transport  # httpx.MockTransport in tests
     self._sleep = sleep
+    self.min_interval, self._last_call = min_interval, None   # 6 s = trial key's ~10 requests/min
 
   def _key(self) -> str:
     key = self._api_key or os.environ.get("COHERE_API_KEY")
@@ -42,6 +43,9 @@ class CohereReranker(Reranker):
     if top_n:
       body["top_n"] = int(top_n)
     headers = {"Authorization": f"Bearer {self._key()}", "Content-Type": "application/json"}
+    if self._last_call is not None:   # wait so calls stay at least min_interval apart
+      self._sleep(max(0.0, self.min_interval - (time.monotonic() - self._last_call)))
+    self._last_call = time.monotonic()
     with httpx.Client(timeout=self.timeout, transport=self._transport) as client:
       for attempt in range(self.max_retries + 1):
         resp = client.post(self.url, json=body, headers=headers)

@@ -33,7 +33,6 @@ MODULES = [
   "claimscan.rerank.cohere",
   "claimscan.rerank.openai_llm",
   "claimscan.rerank.cross_encoder",
-  "claimscan.rerank.llamacpp",
   "claimscan.serve",
 ]
 NEEDS_FAISS = [

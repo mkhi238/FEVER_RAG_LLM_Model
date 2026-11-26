@@ -8,7 +8,7 @@ from __future__ import annotations
 from claimscan.config import config
 from claimscan.rerank.base import Reranker, rerank_hits
 
-BACKENDS = ("none", "cross_encoder", "cohere", "openai", "llamacpp")
+BACKENDS = ("none", "cross_encoder", "cohere", "openai")
 
 
 def load_reranker(cfg=config, backend: str | None = None) -> Reranker | None:
@@ -31,7 +31,4 @@ def load_reranker(cfg=config, backend: str | None = None) -> Reranker | None:
     extra = dict(temperature=None, max_tokens=1024, max_tokens_field="max_completion_tokens") if reasoning else {}
     return OpenAIReranker(model, base_url=cfg.rerank_openai_base_url,
                           mode=cfg.rerank_openai_mode, batch_size=cfg.rerank_batch_size, **extra)
-  if backend == "llamacpp":
-    from claimscan.rerank.llamacpp import LlamaCppReranker
-    return LlamaCppReranker()
   raise ValueError(f"Unknown rerank backend {backend!r}; choose from {BACKENDS}")

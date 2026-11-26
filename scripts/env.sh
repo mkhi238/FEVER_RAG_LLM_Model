@@ -10,3 +10,7 @@ export TORCH_HOME=/mnt/d/torch_cache
 export TMPDIR=/mnt/d/uv/tmp
 export PATH="/mnt/e/llm/bin:$PATH"   # cmake, later llama.cpp tools
 mkdir -p "$TMPDIR"
+# API keys (e.g. COHERE_API_KEY=...) go in the repo-root .env, which is gitignored; never commit them.
+_env_file="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/.env"
+[ -f "$_env_file" ] && { set -a; . "$_env_file"; set +a; }
+unset _env_file
