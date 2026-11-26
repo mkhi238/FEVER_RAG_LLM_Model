@@ -3,9 +3,9 @@
 ## What this is
 A FEVER fact-checker (FAISS bge-small retrieval → heuristic evidence scoring → DeBERTa-v3 verifier)
 being turned into **ClaimScan (RAG + RL)**. Plan PDF: `claimscan-plan-summary.pdf` in the repo root (untracked, not committed; dated Oct 12, 2026, so some parts are stale).
-The plan: front facer + decomposer LLM → LangGraph per-claim loop (research agent Qwen3-4B on llama.cpp
-→ retrieve → rerank → DeBERTa verify, max 3 hops). Only the research agent gets trained (LoRA SFT, then GRPO
-after Dec 22). The verifier is frozen and used as the reward. Branch `refactor` = setup/cleanup only; no plan features are built yet.
+The plan: front facer → LangGraph per-claim loop (decomposer = research agent, one local Qwen3-4B on llama.cpp:
+splits claims, writes queries, decides search-again/stop → retrieve → rerank → DeBERTa verify, max 3 hops; decided
+2026-11-25). Only that Qwen3-4B gets trained (LoRA SFT, then GRPO after Dec 22). The verifier is frozen and used as the reward. Branch `refactor` = setup/cleanup only; no plan features are built yet.
 
 ## Storage rule (hard): nothing on C:
 - Repo: `/mnt/d/FEVER_RAG_LLM_Model` (the WSL home `~` is a disk image ON C:, so never put project files under `~`)
@@ -22,10 +22,6 @@ python -m pytest -q             # slow: D: is WSL drvfs
 python scripts/verifier_smoke.py
 ```
 - pytest uses `--capture=sys` (pyproject). The default tmpfile capture breaks on drvfs.
-- Skills: `/unit-tests [N|file|-k]` = is the code correct (pass/fail); `/fever-full-test [N]` = how accurate is the system (FEVER metric vs baseline).
-- CI: `.github/workflows/unit-tests.yml` runs the unit tests on every push (no artifacts, offline HF), so artifact tests must skip themselves.
-- Skills: `/unit-tests [N|file|-k]` = is the code correct (pass/fail); `/fever-full-test [N]` = how accurate is the system (FEVER metric vs baseline).
-- CI: `.github/workflows/unit-tests.yml` runs the unit tests on every push (no artifacts, offline HF), so artifact tests must skip themselves.
 - Skills: `/unit-tests [N|file|-k]` = is the code correct (pass/fail); `/fever-full-test [N]` = how accurate is the system (FEVER metric vs baseline).
 - CI: `.github/workflows/unit-tests.yml` runs the unit tests on every push (no artifacts, offline HF), so artifact tests must skip themselves.
 - Machine: 15 GB RAM, RTX 2060 6 GB (sm_75), 6 cores. Design for that.
@@ -68,7 +64,7 @@ python scripts/verifier_smoke.py
 4. **Next (when the user's RL training is off the machine):** `python -m claimscan.eval.eval_retriever --retriever faiss bm25 hybrid`,
    then `python -m claimscan.eval.fever_eval --max-claims 200`; then rerun `verifier/prepare.py` (line 0 now fixed in the data) and retrain.
    `claimscan/instruct/` (front decomposer / rear aggregator, LangChain) is the user's; help only if asked.
-   Front decomposer: keep it to splitting text into claims; query writing is the RL-trained research agent's job.
+   Decomposer = the research agent (local Qwen3-4B, RL-trained): splits claims, writes queries, decides search-again/stop.
 
 ## Eval (`claimscan/eval/`, 2026-11-12)
 - `metrics/fever/` = the user's FEVER metric from huggingface/evaluate PR #710 (merged), vendored unchanged and loaded with
@@ -87,7 +83,8 @@ python scripts/verifier_smoke.py
   (bge index ends at `Panel_of_Chairs#1`), and the training shards 0–3 were never added.
 - The old verifier's 94–95% figure came from the old split: its validation set was all 1,500 NEI examples, so TRUE/FALSE was never checked.
 - The llama.cpp CUDA build is blocked: CUDA 12.4 nvcc needs gcc ≤ 13, and WSL has gcc 15 (options in `llamacpp/README.md`).
-- The big front-facer MoE won't fit in 15 GB RAM, so route front_facer/decomposer to a hosted API (`llamacpp/roles.yaml`).
+- The big front-facer MoE won't fit in 15 GB RAM, so route front_facer to a hosted API (`llamacpp/roles.yaml`). The decomposer is now the local Qwen3-4B
+  (2026-11-25); `roles.yaml` still has decomposer sharing front_facer, which is the user's to change.
 
 ## User to-dos (not Claude's)
 - Make the cache settings permanent: `cat scripts/env.sh >> ~/.bashrc`
