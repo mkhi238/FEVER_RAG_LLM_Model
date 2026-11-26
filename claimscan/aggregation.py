@@ -150,3 +150,39 @@ def aggregate_verdict(claim: str, v: Verdict, llm) -> AggregatedVerdict:
                 _redact(f"{type(e).__name__}: {e}"))
     base.aggregator_error = f"aggregator unavailable ({type(e).__name__})"
     return base
+
+
+def parse_veto(text: str, schema=None):
+  """The model's reply -> VetoOutput. Takes the outermost {...}, so ```json fences or extra words around it are fine."""
+  if schema is None:
+    from claimscan.instruct.rear_aggregator import VetoOutput as schema
+  start, end = text.find("{"), text.rfind("}")
+  if start < 0 or end < start:
+    raise ValueError(f"no JSON object in the aggregator reply: {text[:200]!r}")
+  return schema.model_validate_json(text[start:end + 1])
+
+
+def build_hf_llm(adapter_dir, max_new_tokens: int = 256):
+  """The trained aggregator (Gemma + QLoRA SFT/DPO adapter, claimscan/instruct/posttraining.py) on the local GPU,
+  in 4-bit like in training. Returns the runnable aggregate() expects: chat messages -> VetoOutput (greedy decoding)."""
+  import torch
+  from langchain_core.runnables import RunnableLambda
+  from peft import AutoPeftModelForCausalLM
+  from transformers import AutoTokenizer, BitsAndBytesConfig
+
+  tok = AutoTokenizer.from_pretrained(adapter_dir)
+  model = AutoPeftModelForCausalLM.from_pretrained(
+    adapter_dir, dtype=torch.bfloat16, attn_implementation="eager", device_map="cuda",
+    quantization_config=BitsAndBytesConfig(load_in_4bit=True, bnb_4bit_quant_type="nf4",
+                                           bnb_4bit_compute_dtype=torch.bfloat16)).eval()
+  roles = {"system": "system", "human": "user", "ai": "assistant"}
+
+  def run(messages):
+    chat = [{"role": roles[m.type], "content": m.content} for m in messages]
+    inputs = tok.apply_chat_template(chat, add_generation_prompt=True, return_dict=True,
+                                     return_tensors="pt").to(model.device)
+    with torch.no_grad():
+      out = model.generate(**inputs, max_new_tokens=max_new_tokens, do_sample=False)
+    return parse_veto(tok.decode(out[0, inputs["input_ids"].shape[1]:], skip_special_tokens=True))
+
+  return RunnableLambda(run)

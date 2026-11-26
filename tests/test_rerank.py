@@ -168,3 +168,43 @@ def test_rerank_hits_keeps_score_and_orders():
   assert "rerank_score" not in hits[0]  # input untouched
   top = rerank_hits(StubReranker(), "claim", hits, corpus, top_n=2)
   assert len(top) == 2 and top[0]["rerank_score"] == len("a much longer sentence")
+
+
+def test_cohere_waits_between_calls(monkeypatch):
+  monkeypatch.setenv("COHERE_API_KEY", "k")
+  waits = []
+  rr = CohereReranker(sleep=waits.append, transport=httpx.MockTransport(
+    lambda r: httpx.Response(200, json={"results": [{"index": 0, "relevance_score": 1.0}]})))
+  rr.rerank("q", DOCS)
+  rr.rerank("q", DOCS)
+  assert len(waits) == 1 and 5.0 < waits[0] <= 6.0   # second call waits out the 6 s trial-key gap
+
+
+class FailingReranker(Reranker):
+  def rerank(self, query, docs, top_n=None):
+    raise RuntimeError("COHERE_API_KEY is not set")
+
+
+@pytest.mark.parametrize("reranker, order", [
+  (StubReranker(), ["A#1", "B#0"]),        # reranked: longest sentence first, top k=2
+  (FailingReranker(), ["A#0", "B#0"]),     # fails open: retriever order, top k=2
+  (None, ["A#0", "B#0"]),                  # no reranker: retriever's k hits
+])
+def test_pipeline_uses_reranker(monkeypatch, reranker, order):
+  from claimscan import pipeline
+  corpus = pd.DataFrame({"id": ["A", "A", "B"], "line": [0, 1, 0],
+                         "text": ["short", "a much longer sentence", "mid size"]}).set_index(["id", "line"]).sort_index()
+  hits = [{"id": "A", "line": 0, "score": 0.1}, {"id": "B", "line": 0, "score": 0.2},
+          {"id": "A", "line": 1, "score": 0.3}]
+  asked = []
+
+  class Retriever:
+    def search(self, q, k):
+      asked.append(k)
+      return hits[:k]
+
+  monkeypatch.setattr(pipeline, "get_evidence", lambda *a, **kw: [])   # stop before the verifier
+  services = pipeline.Services(model=None, retriever=Retriever(), corpus_df=corpus, reranker=reranker)
+  v = pipeline.fact_check_detailed("claim", services, k=2)
+  assert [h["docid"] for h in v.hits] == order
+  assert asked == [config.rerank_candidates if reranker else 2]   # the reranker gets all candidates

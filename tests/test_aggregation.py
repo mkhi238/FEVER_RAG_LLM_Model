@@ -338,3 +338,11 @@ def test_api_missing_key_fails_open(client_with, monkeypatch):
   with client_with([5.0, 0.0, 0.0], llm=llm) as client:
     body = _post(client)
   assert body["prediction"] == "TRUE" and "TEST_AGG_KEY" in body["aggregator_error"]
+
+
+def test_parse_veto_handles_fences_and_garbage():
+  reply = '```json\n{"veto": true, "veto_reason": "off-topic", "explanation": "[A:0] is about B.", "llm_confidence": 0.95}\n```'
+  out = aggregation.parse_veto(reply)
+  assert out.veto is True and out.llm_confidence == 0.95
+  with pytest.raises(ValueError):
+    aggregation.parse_veto("I cannot answer that.")
