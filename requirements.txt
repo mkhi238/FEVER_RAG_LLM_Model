@@ -29,6 +29,7 @@ pyarrow>=26.0                   # parquet (docids, corpus) and the sentence-stor
 # --- serving + config
 fastapi>=0.162
 uvicorn>=0.54
+httpx>=0.28                     # Cohere / OpenAI rerank backends (rerank.backend)
 pydantic>=2.14,<3
 pyyaml>=6.0
 

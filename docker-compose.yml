@@ -35,6 +35,7 @@ services:
       CLAIMSCAN_AGGREGATOR_MODEL:
       CLAIMSCAN_AGGREGATOR_API_KEY_ENV:       # NAME of the env var holding the key, e.g. OPENAI_API_KEY
       OPENAI_API_KEY:                         # the key itself: from your shell or an untracked .env, never a committed file
+      COHERE_API_KEY:                         # reranker key (rerank.backend: cohere), same rule; unset = retriever order
     restart: unless-stopped
 
   llama:
