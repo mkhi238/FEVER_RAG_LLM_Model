@@ -40,3 +40,14 @@ def test_extend_adds_missing_shards(tmp_path):
   D, I = new.search(q[:50], 5)
   sD, sI = IVFListScanner(tmp_path / "faiss_index_full.bin", nprobe=8).search(q[:50], 5)
   assert (sI == I).all() and np.allclose(sD, D, atol=1e-5)
+
+  # Docker: the index is mounted elsewhere and read-only; the .ivfdata is found next to the .bin (same flags as FAISSRetriever)
+  import os, shutil
+  moved = tmp_path / "mounted"
+  moved.mkdir()
+  for f in ("faiss_index_full.bin", "faiss_index_full.ivfdata", "all_docids_full.csv"):
+    shutil.copy(tmp_path / f, moved)
+  (tmp_path / "faiss_index_full.ivfdata").unlink()
+  os.chmod(moved / "faiss_index_full.ivfdata", 0o444)
+  sI2 = IVFListScanner(moved / "faiss_index_full.bin", nprobe=8).search(q[:50], 5)[1]
+  assert (sI2 == I).all()

@@ -47,7 +47,8 @@ class IVFListScanner:
     # an on-disk index (faiss_extend.py: <name>.bin + <name>.ivfdata) keeps the lists in the .ivfdata file;
     # it must not be opened with IO_FLAG_MMAP (faiss segfaults)
     ondisk = self.path.with_suffix(".ivfdata").exists()
-    self.index = faiss.read_index(str(self.path), 0 if ondisk else faiss.IO_FLAG_MMAP)
+    self.index = faiss.read_index(str(self.path), faiss.IO_FLAG_ONDISK_SAME_DIR | faiss.IO_FLAG_READ_ONLY if ondisk
+                                  else faiss.IO_FLAG_MMAP)
     ivf = faiss.downcast_index(faiss.extract_index_ivf(self.index))
     if not isinstance(ivf, faiss.IndexIVFFlat):
       raise TypeError(f"expected IndexIVFFlat, got {type(ivf).__name__}")

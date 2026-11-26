@@ -21,9 +21,11 @@ class FAISSRetriever:
     
     print(f"Loading FAISS index from {index_path}{' (mmap)' if mmap else ''}")
     # mmap: the 26 GB bge index then needs ~0.85 GB RAM; the OS pages lists in on demand
-    # An on-disk index (faiss_extend.py: <name>.bin + <name>.ivfdata) mmaps its .ivfdata itself; IO_FLAG_MMAP on it segfaults.
     ondisk = index_path.with_suffix(".ivfdata").exists()
-    self.index = faiss.read_index(str(index_path), faiss.IO_FLAG_MMAP if mmap and not ondisk else 0)
+    # On-disk index (faiss_extend.py: <name>.bin + <name>.ivfdata) mmaps its .ivfdata itself (IO_FLAG_MMAP on it segfaults).
+    # Find the .ivfdata next to the .bin (its stored absolute path differs in Docker) and open it read-only (ro mounts).
+    ONDISK = faiss.IO_FLAG_ONDISK_SAME_DIR | faiss.IO_FLAG_READ_ONLY
+    self.index = faiss.read_index(str(index_path), ONDISK if ondisk else (faiss.IO_FLAG_MMAP if mmap else 0))
 
     # Set search parameters for IVF index
     if hasattr(self.index, 'nprobe'):
