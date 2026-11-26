@@ -1,10 +1,10 @@
 ---
-name: fever
-description: Run the FEVER claim suite (pytest tests/test_fever_suite.py) on N claims, default 10 (the 300-claim max gives the full numbers), on the shipped hybrid retriever (FAISS + BM25 without RM3) end to end through the verifier, and report label accuracy, FEVER score, evidence/retrieval recall and per-claim changes against the baseline. Use after a pipeline change ("/fever" quick, "/fever 300" full), or when asked for the claim suite or whether the baseline still reproduces.
+name: fever-full-test
+description: 'FEVER full test: answers "how well does the whole system fact-check?". Runs real FEVER validation claims end to end through the shipped pipeline (hybrid FAISS + BM25 retrieval -> evidence scoring -> DeBERTa verifier) and scores them with the official FEVER metric: label accuracy, FEVER score, evidence and retrieval recall, and per-claim flips against the saved baseline. N claims, default 10 (~3.5 min, a quick check); "/fever-full-test 300" gives the full benchmark numbers (~10 min). Needs the artifacts on D:, so it runs locally, not in CI. Use after changing retrieval, scoring, the verifier or the config, or when asked whether accuracy or the baseline still holds.'
 argument-hint: "[N claims, default 10, max 300]"
 ---
 
-# /fever [N]: the FEVER claim suite (shipped hybrid only)
+# /fever-full-test [N]: the FEVER claim suite (shipped hybrid only)
 
 The 300 FEVER validation claims (seed 0, 100 per label) from `python -m claimscan.eval.benchmark --n 300`, run end to
 end on the shipped **hybrid** retriever (FAISS + BM25 without RM3, RRF; benchmark name `hybrid_norm3`; k=30, conf 0.5).
@@ -12,10 +12,10 @@ N < 300 runs a label-balanced slice of the same claims (the first of each label 
 
 | Command | Claims | Time | Checks |
 |---|---|---|---|
-| `/fever` | 10 (default, same N as the hook's `/tests 10`) | ~3.5 min, mostly loading | per-claim predictions |
-| `/fever 300` | 300 | ~10 min | per-claim predictions + label accuracy, FEVER score, retrieval metrics |
+| `/fever-full-test` | 10 (default, same N as the hook's `/unit-tests 10`) | ~3.5 min, mostly loading | per-claim predictions |
+| `/fever-full-test 300` | 300 | ~10 min | per-claim predictions + label accuracy, FEVER score, retrieval metrics |
 
-A plain `pytest` / `/tests` / the Stop hook never start it (tests/conftest.py).
+A plain `pytest` / `/unit-tests` / the Stop hook never start it (tests/conftest.py).
 
 ## Run (low priority, 2 threads, in the background)
 
@@ -50,9 +50,9 @@ Baseline: `tests/data/fever_suite_hybrid_norm3_baseline.json` (re-baselined 2026
 `MoritzLaurer/DeBERTa-v3-base-mnli-fever-anli`): label accuracy 0.640, FEVER score 0.483, recall_set@10 0.660.
 `--verifier ours` runs the old checkpoint (0.51 / 0.38) into its own latest_n<N>_ours.json, without the baseline check. The test also requires `bm25.rm3: false`. A failure means the pipeline's
 behaviour changed (retrieval, evidence scoring or the verifier): say which number moved. Don't fix anything inside
-this skill. If `/fever` fails, offer `/fever 300` to see how big the change is.
+this skill. If `/fever-full-test` fails, offer `/fever-full-test 300` to see how big the change is.
 
-## Not part of /fever: verifier with gold evidence
+## Not part of /fever-full-test: verifier with gold evidence
 
 `pytest tests/test_fever_suite.py -k gold_evidence -s` measures the verifier alone, given the gold sentences instead of
 retrieved ones (~200 claims, options `--verifier`, `--gold-split`). Run it only when asked.

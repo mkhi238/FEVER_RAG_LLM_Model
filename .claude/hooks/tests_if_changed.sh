@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Stop hook: the hook form of `/tests 10`.
+# Stop hook: the hook form of `/unit-tests 10`.
 # If any .py under claimscan/ or tests/ (or pyproject.toml) changed since the last run, run the first 10 pytest
 # tests in the background (detached, nice 19, flock so only one run at a time). The hook itself only does a
 # `find` and returns at once. The next Stop after a run finishes reports its result line once.
@@ -20,7 +20,7 @@ LOG="$ART/eval/tests_hook.log"
 msg=""
 # 1. Report a finished run once.
 if [ -s "$RESULT" ] && { [ ! -e "$REPORTED" ] || [ "$RESULT" -nt "$REPORTED" ]; }; then
-  msg="Hook /tests $N: $(cat "$RESULT") (log: $LOG)"
+  msg="Hook /unit-tests $N: $(cat "$RESULT") (log: $LOG)"
   touch "$REPORTED"
 fi
 

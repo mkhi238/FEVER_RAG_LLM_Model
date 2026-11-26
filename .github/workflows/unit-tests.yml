@@ -1,0 +1,48 @@
+# CI: run the unit tests (tests/, the same as /unit-tests) on every push and pull request.
+#
+# GitHub's runner has no artifacts (FAISS, BM25 index, SQLite store, verifier) and no GPU, so the tests
+# that need them skip themselves, and the FEVER full test (tests/test_fever_suite.py) is deselected by
+# tests/conftest.py. Accuracy is measured locally with /fever-full-test, not here.
+name: unit-tests
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: unit-tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  pytest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      CLAIMSCAN_ARTIFACTS: /tmp/no-artifacts   # nothing there: artifact tests skip
+      HF_HUB_OFFLINE: "1"                      # unit tests must never download a model
+      TRANSFORMERS_OFFLINE: "1"
+      PIP_DISABLE_PIP_VERSION_CHECK: "1"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: |
+            requirements.txt
+            requirements-dev.txt
+
+      - uses: actions/setup-java@v4             # pyserini (BM25 half of the hybrid retriever) needs Java 21
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Install (CPU torch first, so pip never pulls the CUDA wheels)
+        run: |
+          pip install torch --index-url https://download.pytorch.org/whl/cpu
+          pip install -r requirements-dev.txt -e .
+
+      - name: Unit tests
+        run: python -m pytest -q -rs
