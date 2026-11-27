@@ -52,6 +52,7 @@ args_dpo = DPOConfig(
     output_dir="/mnt/d/crisis-claim-analysis/artifacts/models/aggregator_dpo",   # on D:
     per_device_train_batch_size=1, gradient_accumulation_steps=8, gradient_checkpointing=True,
     max_length=1024, max_steps=150, logging_steps=10, report_to="none",
+    learning_rate=5e-6,   # TRL's DPO default 1e-6 is for full fine-tuning; too small for LoRA
 )
 
 trainer = DPOTrainer(
