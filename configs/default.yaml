@@ -111,5 +111,27 @@ verifier:
   nei_prob_threshold: 0.2
   max_length: 512
 
+# Natural-logic + FOL layer (branch natlog, docs/NATLOG_FOL.md). Not on the API path yet.
+# The three marked "open" are the user's design questions; the values are placeholders, not tuned.
+natlog:
+  checker: verifier          # how each FOL unit is checked: verifier (the Verify decision as is) | natlog (spans + automaton)
+  quantifier_mode: unit      # open: unit | distribute | nei (claimscan/neurosymbolic_layer/fol/hypothesis.py)
+  min_sim: 0.6               # open: span alignment cut-off (natlog/align.py MIN_SIM); per task: tasks.<task>.min_sim
+  forward_supports: true     # open: does a more specific evidence span (evidence ⊑ claim span) count as support?
+  decomposer_attempts: 2     # tries (first + repairs) before the decomposer falls back to the whole claim
+  # Per-task NLI (claimscan/verifier/tasks.py). base_model null = verifier.inference_model, shared by every task.
+  # adapter: a LoRA dir (relative = under artifacts_root), null = zero-shot. model: a separate model for that task
+  # (HF name or dir) instead of base + adapter.
+  base_model: null
+  task_data_dir: natlog/task_data      # claimscan/verifier/task_data.py writes <task>/{train,dev}.jsonl here
+  adapter_dir: natlog/adapters         # claimscan/verifier/train_task_adapter.py writes <task>/ here
+  fol_sft_dir: natlog/fol_sft          # claimscan/neurosymbolic_layer/fol/sft_data.py
+  tasks:
+    verify:  {model: null, adapter: null, min_sim: null}   # frozen: the FEVER verifier itself (also the RL reward)
+    define:  {model: null, adapter: null, min_sim: null}
+    explain: {model: null, adapter: null, min_sim: null}
+    question: {model: null, adapter: null, min_sim: null}
+    example: {model: null, adapter: null, min_sim: null}
+
 mlflow_experiment_name: fever_verifier
 mlflow_retriever_experiment: retriever_eval

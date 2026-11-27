@@ -93,6 +93,10 @@ class ClaimScanConfig:
   # TRUE/FALSE -> NEI when the verifier's P(NEI) >= this (None = off)
   verifier_nei_prob_threshold: float | None = None
 
+  # natural-logic + FOL layer settings, the natlog: section of default.yaml as a dict
+  # (claimscan/neurosymbolic_layer/fol/verify.py settings() fills the defaults; paths there are under artifacts_root)
+  natlog: dict = field(default_factory=dict)
+
   @property
   def bm25_index_dir(self) -> Path:
     return self.bm25_dir / "index"
@@ -179,6 +183,7 @@ def load_config(path: str | os.PathLike | None = None) -> ClaimScanConfig:
     aggregator_api_key_env=str(os.environ.get("CLAIMSCAN_AGGREGATOR_API_KEY_ENV", ag.get("api_key_env") or "")),
     verifier_inference_model=str(v.get("inference_model", "MoritzLaurer/DeBERTa-v3-base-mnli-fever-anli")),
     verifier_nei_prob_threshold=(None if v.get("nei_prob_threshold") is None else float(v["nei_prob_threshold"])),
+    natlog=dict(raw.get("natlog") or {}),
   )
 
   # Must happen before transformers / sentence_transformers are imported.
