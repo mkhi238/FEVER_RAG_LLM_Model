@@ -1,44 +1,59 @@
 # ClaimScan (RAG + RL)
 
-Right now this is a FEVER fact-checker. You give it a claim, it pulls evidence from a 25.2M-sentence Wikipedia corpus, scores that evidence, and a fine-tuned DeBERTa-v3 verifier says TRUE, FALSE or NOT ENOUGH INFO. A Gemma rear aggregator can then veto the verdict down to NEI.
+Right now this is a FEVER fact-checker that works. You give it a claim, it pulls evidence from a 25.2M-sentence Wikipedia corpus, scores that evidence, and a DeBERTa NLI verifier says TRUE, FALSE or NOT ENOUGH INFO. A Gemma rear aggregator then explains the verdict.
 
-## Where this is going
+I'm still going to do RAG + RL, but I really am going to pivot the idea now a bit towards something I can actually use. I find often when I'm reading papers, I want quick definitions over highlighted words with AI. Like 1-2 sentence definitions. I highlight over the word, ask for a definition/description, and it gives it to me. That would make reading papers SO easy for me. It's also the perfect project for me to practice my agentic coding + workflow + sys design.
 
-I'm still going to do RAG + RL, but I really am going to pivot the idea now a bit towards something I can actually use.
-
-I find often when I'm reading papers, I want quick definitions over highlighted words with AI. Like 1-2 sentence definitions. I think RAG + RL (even ignoring the RL, but the RAG part) is a perfect archetype for this: a small LLM kind of thing which can define single terms or sentences for me. I highlight over the word, ask for a definition/description, and it gives it to me. That would make reading papers SO easy for me.
-
-It's also the perfect project for me to practice my agentic coding + workflow + sys design.
-
-## How it works
+## What works now
 
 ```
 claim
-  -> retrieval: BM25 (Lucene) / FAISS bge-small / RRF hybrid of both (k=60)
-  -> neurosymbolic evidence scoring: rank prior x claim-type rules
-  -> DeBERTa-v3 verifier -> TRUE / FALSE / NOT ENOUGH INFO
-  -> rear aggregator (Gemma on llama.cpp, through LangChain): may veto to NEI
+  -> retriever: hybrid FAISS (bge-small) + BM25 (Lucene, no RM3), fused with RRF (k=60)
+  -> reranker: Cohere rerank-v3.5 (top 10 of 100)
+  -> neurosymbolic layer: retrieval rank prior x claim-type rules
+  -> verifier: DeBERTa-v3 NLI (MoritzLaurer/DeBERTa-v3-base-mnli-fever-anli) -> TRUE / FALSE / NOT ENOUGH INFO
+  -> rear aggregator: Gemma-3-4b (LoRA SFT + DPO), writes the explanation
 ```
 
-We need an LLM in the back to pick up the responses and give an answer. I give the rear aggregator veto power, so it can change the verdict to NEI if its conclusion from the most evidence disagrees with the decision. The rules:
-- It only ever changes TRUE/FALSE to NEI. It never flips TRUE to FALSE or back.
-- If the verifier's confidence is high (0.6 or more), don't bother flipping. Only flip if the confidence is below 0.6, or the model truly believes this is an unfactual/impossible situation (it's very sure, >= 0.9).
-- It's off by default (`aggregator.enabled: false` in `configs/default.yaml`), and if the server is down you just get the verifier's verdict.
+- **Neurosymbolic layer** (`claimscan/neurosymbolic_layer/`): whole-word rules (hedge words, word overlap, page-title bonus, claim-type rules), clamped so no single keyword can sink or dominate a sentence. The goal was for it to work decently well without being too restrictive or too useless either.
+- **NEI rule:** if the verifier's P(NEI) >= 0.2, a TRUE/FALSE becomes NOT ENOUGH INFO (`verifier.nei_prob_threshold`). We should strictly be using the confidence the verifier gives on NEI directly.
+- **Rear aggregator:** we need an LLM in the back to pick up the responses and give an answer. The rear takes from the verifier the softmax output and the top k evidence used to come to that conclusion. It used to have veto power (it could only turn TRUE/FALSE into NEI), but it vetoed too many correct verdicts, so I took away its veto power. Now the LLM only explains. It's off by default in the API (`aggregator.enabled: false`) and fails open: if the server is down you just get the verifier's verdict.
 
-`retriever.kind` in `configs/default.yaml` picks `hybrid` (default: FAISS + BM25 without RM3), `bm25` or `faiss` (the low-memory option).
+**Numbers** (`/fever-full-test 300`, 300 FEVER validation claims, k=30): label accuracy 0.67 with the NEI rule (0.65 without it, FEVER score 0.467). Per gold label the verifier gets TRUE 91%, FALSE 76%, NEI 28% (before the NEI rule), so most errors are NEI claims called TRUE/FALSE. Retrieval isn't the limit. If data is the issue, it's data everywhere; in the retriever and in the fine tuning stages. We probably need to train on a LOT more data.
 
-The llama.cpp side (build, serving, one config per LLM role) is walked through in [llamacpp/README.md](llamacpp/README.md).
+## Where this is going
+
+The pipeline is simple:
+
+```
+prompt
+  -> Qwen decomposer        (the shepherd: decompose to claims, write the queries)
+  -> retriever              (data facts are stored here)
+  -> reranker               (you don't need DeBERTa for the reranker)
+  -> loop until we determine it is ok   (enough evidence? change k or search again, max 3 loops)
+  -> verifier               (optional: only if the Qwen decomposer determined it to be a verification task)
+  -> Gemma rear aggregator  (takes in all and outputs a response)
+```
+
+Gemma for back, Qwen for front. The Qwen decomposer can still just be a small Qwen agent, just the 4B model inheriting more tasks. This makes sense since it's not executing complex tasks, and we know small models can work with RL anyways. This also acts a lot more like a traditional RAG pipeline, and it also enables us to scale more data (papers, definitions, data, knowledge, all sorts of things, not just FEVER).
+
+We are pivoting this towards **explanation** rather than claim verification.
+
+One thing I really wanted to do was to have more semantic ideas in this. The neurosymbolic layer is a start, but I wanted to explore how semanticity/NLP ideas can also be used:
+- **Natural logic + FOL, both, layered.** Natural logic in RAG, i.e. like formal logic, first order models, or learning semantic meaning of words. The claim breaks down into formal logic, and we see if the evidence supports that. We train a DeBERTa to predict the logical relations (same, entailment, negation, unrelated), which is smarter than my own neurosymbolic layer, and it can be extended to other semantic meanings (quantifiers and set theory). Plan: `docs/OVERHAUL.md` (on the `overhaul` branch, not pushed yet).
+- **RL as a librarian.** My own idea: the Qwen model learns to write the searches, rewarded by the FEVER metric, and I suspect it can LEARN real semantic meaning by reasoning. LoRA SFT first, then GRPO. I may do this project in a hackathon where I have a lot more compute, so scaling this up is the next step.
 
 ## Layout
 
 ```
 claimscan/
-  data/                 build FEVER claims / evidence / corpus parquet
+  data/                 FEVER SQLite store (fever_db.py), post-training data
   retrieval/            FAISS + BM25 retrievers, RRF hybrid, index builders
+  rerank/               Cohere / cross-encoder / OpenAI rerankers
   neurosymbolic_layer/  claim-type rules and evidence scoring
   evidence/             evidence selection + SQLite sentence store
-  verifier/             DeBERTa model, training data prep, training
-  instruct/             front decomposer + rear aggregator (LangChain)
+  verifier/             DeBERTa verifiers (HF NLI default, our old checkpoint), training
+  instruct/             front decomposer + rear aggregator (LangChain), posttraining (SFT + DPO)
   eval/                 recall@k, retriever benchmark, FEVER metric
   graph/                makes the plots in graphs/
   api/                  FastAPI service
@@ -46,69 +61,45 @@ claimscan/
 configs/default.yaml    all settings
 llamacpp/               llama.cpp build/serve scripts, one config per LLM role
 docker/                 Docker image for the API
-scripts/  tests/  graphs/
 ```
 
 ## Run it
 
-`requirements.txt` is just what the API needs. `requirements-dev.txt` adds training, eval, BM25, graphs and tests. BM25 (pyserini) also needs a **Java 21 JDK**, which pip can't install: `sudo apt install openjdk-21-jdk-headless`.
+`requirements.txt` is just what the API needs; `requirements-dev.txt` adds training, eval, BM25, graphs and tests. BM25 (pyserini) also needs a **Java 21 JDK**: `sudo apt install openjdk-21-jdk-headless`.
 
 ```bash
 git clone https://github.com/mkhi238/FEVER_RAG_LLM_Model.git && cd FEVER_RAG_LLM_Model
-source scripts/env.sh                   # puts caches and temp on D:/E:, not C:
+source scripts/env.sh                   # caches and temp on D:/E:, not C:
 uv python install 3.12 && uv venv --python 3.12 .venv
 uv pip install --python .venv/bin/python -r requirements-dev.txt
 uv pip install --python .venv/bin/python --no-deps -e .
 ```
 
-Data, indexes and the verifier checkpoint live outside the repo, under `artifacts_root` in `configs/default.yaml`. Override it with `CLAIMSCAN_ARTIFACTS=/path` (or a whole config with `CLAIMSCAN_CONFIG=/path/to.yaml`).
+Data, indexes and models live outside the repo, under `artifacts_root` in `configs/default.yaml` (override with `CLAIMSCAN_ARTIFACTS=/path`). The Cohere key goes in the repo-root `.env` (`COHERE_API_KEY=...`, gitignored).
 
 ```bash
-uvicorn claimscan.api.main:app            # POST /fact-check {"claim": "..."}, GET /health
-python scripts/verifier_smoke.py          # just the verifier
-python -m claimscan.eval.benchmark --n 300                 # compare all retrievers
-python -m claimscan.eval.fever_eval --max-claims 200       # end-to-end FEVER score
-python -m pytest -q
+source .venv/bin/activate && source scripts/env.sh
+uvicorn claimscan.api.main:app        # POST /fact-check {"claim": "..."}, GET /health
+python -m pytest -q                   # unit tests (also run by CI on every push)
+python scripts/verifier_smoke.py      # just the verifier
 ```
 
-The API uses the same `fact_check_detailed` as the benchmark (k=30, 0.5 confidence floor), so benchmark numbers are what the API does. It reads sentence text from the FEVER SQLite file (`claimscan/data/fever_db.py`) instead of loading the 4 GB corpus.
-
-Benchmark and training runs are logged to MLflow. To browse them:
+In Claude Code: `/unit-tests` checks the code is correct, `/fever-full-test 300` checks how accurate the system is. The API runs the same `fact_check_detailed` as the benchmark (k=30), so benchmark numbers are what the API does. Benchmark and training runs are logged to MLflow:
 
 ```bash
 mlflow ui --backend-store-uri sqlite:////mnt/d/crisis-claim-analysis/artifacts/mlflow/mlflow.db
 ```
 
-Docker: see [docker/README.md](docker/README.md).
+Docker: `docker compose up --build -d`, then see [docker/README.md](docker/README.md). The llama.cpp side is walked through in [llamacpp/README.md](llamacpp/README.md).
 
 ## Graphs
 
-### Retriever recall: complete gold evidence set in the top k
-
 ![Retriever recall_set@k](graphs/retriever_recall_set.png)
 
-200 SUPPORTS/REFUTES claims from FEVER validation: the 300-claim benchmark sample minus its 100 NEI claims, which have no gold evidence. The y-axis is the share of claims with a full gold evidence set in the top k, which is what the FEVER score needs.
-- **BM25 without RM3** is the strongest single retriever. It leads at k ≤ 10 (41% at k=1) and has the best MRR (0.54).
-- **Hybrid without RM3** is best from k=10 up, reaching 78% at k=50.
-- **FAISS (bge-small)** is far behind (52% at k=50), partly because its index covers only shards 0–174 of 253.
-- **RM3 query expansion hurts** both BM25 and the hybrid.
-
-All graphs are in [`graphs/`](graphs/README.md). Rebuild them with `python -m claimscan.graph.make_graphs`. They're drawn from saved results, so nothing gets retrieved or evaluated again.
-
-### Verifier training curves
-
-![DeBERTa verifier training curves](graphs/verifier_training_curves.png)
-
-DeBERTa-v3 verifier, 3 epochs: training loss and train/validation accuracy. Take the ~95% validation accuracy with a grain of salt. It came from an **unshuffled split** and from training data that lost the line-0 evidence (see below), so it overstates real-world accuracy.
+Share of the 200 SUPPORTS/REFUTES claims with a full gold evidence set in the top k, which is what the FEVER score needs. From the benchmark run before the full FAISS index (shards 0-174 only). All graphs: [`graphs/`](graphs/README.md), rebuilt with `/graphs`.
 
 ## Known limits
 
-- **FEVER line 0 is stored as -1** (the HF loader turns the falsy 0 into -1), which is 46% of gold pairs. `claimscan/eval/gold.py` fixes it for eval; `verifier/prepare.py` doesn't, so the verifier was trained without that evidence.
-- The FAISS index covers only 17.1M of the 25.2M sentences (shards 0–174 of 253). It's 26 GB, so it's memory-mapped (`retriever.mmap`).
-- The verifier's 94–95% came from an unshuffled split. It says NEI with 0.995 confidence on "Obama was born in Hawaii".
-
-## Next
-
-- QLoRA finetuning on the aggregator model.
-- Allow reasoning, and let it make decisions (like loop engineering) so it can ask for another retrieval.
-- The research agent (Qwen3-4B on llama.cpp) with LoRA SFT, then GRPO, using the frozen verifier as the reward.
+- NEI is the weak spot (28% before the NEI rule, 39% after). Several "NEI" claims are really supported by the retrieved sentences (FEVER label noise).
+- The full FAISS index (39 GB, on disk) is slow cold through the API: 30-110 s per query from D:.
+- The trained Gemma DPO adapter copies its SFT targets (its confidence is always 0.95/0.05).
