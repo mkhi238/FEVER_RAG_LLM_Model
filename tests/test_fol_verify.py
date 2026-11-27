@@ -68,6 +68,12 @@ def test_kleene(formula, a, b, want):
   assert compose(parse(formula), ["e"], table_checker(table)).label == want
 
 
+def test_every_refuted_part_is_named():
+  v = compose(parse("A(rex) ∧ B(rex) ∧ C(rex)"), ["e0", "e1"],
+              table_checker({"rex is A": ("FALSE", 0), "rex is B": ("TRUE", 0), "rex is C": ("FALSE", 1)}))
+  assert v.label == "FALSE" and v.deciding == [0, 2] and v.used == [0, 1]
+
+
 def test_negated_unit_reason():
   v = compose(parse("¬A(rex)"), ["rex is A."], table_checker({"rex is A": ("TRUE", 0)}))
   assert v.label == "FALSE" and "negates" in v.reason

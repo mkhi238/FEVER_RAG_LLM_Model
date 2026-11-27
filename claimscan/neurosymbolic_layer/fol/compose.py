@@ -86,9 +86,9 @@ def compose(formula: Formula, evidence: list[str], checker, entities: dict[str, 
     parts = [ev(a) for a in node.args]
     vals = [v for v, _ in parts]
     v = (_kleene_and if isinstance(node, And) else _kleene_or)(vals)
-    decisive = F if isinstance(node, And) else T     # one such part settles it
+    decisive = F if isinstance(node, And) else T     # one such part settles it; every such part is named
     if v == decisive:
-      why = next(w for pv, w in parts if pv == v)
+      why = [i for pv, w in parts if pv == v for i in w]
     else:                                             # all parts matter, or the unknown ones do
       why = [i for pv, w in parts if v != N or pv == N for i in w]
     return v, why
