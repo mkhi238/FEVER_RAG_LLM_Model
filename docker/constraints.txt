@@ -1,0 +1,26 @@
+# Exact versions for the Docker image, verified in .venv on 2026-11-24 (uv pip freeze).
+# Used as a pip constraints file (-c): it pins whatever requirements.txt pulls in without adding
+# packages, so requirements.txt stays the one list of what the code needs.
+# torch is not here: the Dockerfile installs the CPU wheel (torch==2.14.1) from the PyTorch index.
+transformers==5.22.2
+tokenizers==0.23.3
+huggingface-hub==2.4.0
+sentencepiece==0.2.3
+protobuf==7.36.2
+sentence-transformers==6.3.0
+faiss-cpu==1.16.0
+numpy==2.5.4
+pandas==3.1.1
+pyarrow==26.0.1
+fastapi==0.162.5
+uvicorn==0.54.0
+pydantic==2.14.3
+pydantic-core==2.50.4
+pyyaml==6.0.3
+langchain-core==1.8.0
+langchain-openai==1.7.4
+langchain-together==0.4.0
+openai==3.49.0
+tiktoken==0.14.0
+pyserini==2.4.0
+pyjnius==1.9.0

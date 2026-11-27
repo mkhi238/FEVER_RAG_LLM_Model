@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "claimscan"
+version = "0.1.0"
+description = "Claim verification over FEVER Wikipedia: FAISS retrieval + DeBERTa verifier (RAG + RL build)"
+requires-python = ">=3.10"
+dynamic = ["dependencies"]
+
+[project.optional-dependencies]
+dev = ["pytest>=9.2"]
+
+[tool.setuptools.dynamic]
+dependencies = { file = ["requirements.txt"] }
+
+[tool.setuptools.packages.find]
+include = ["claimscan*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+# In-memory capture: pytest's default tmpfile capture fails on the WSL D:/E: (drvfs) mounts.
+# The FEVER claim suite (tests/test_fever_suite.py) needs the artifacts and minutes of CPU, so it only runs
+# when the file is named: pytest tests/test_fever_suite.py [--fever-claims 10] (tests/conftest.py)
+addopts = "--capture=sys"
+markers = [
+  "fever_suite: end-to-end FEVER claim suite on the artifacts (deselected by default)",
+  "gold_evidence: verifier-with-gold-evidence measurement (only with -k/-m gold_evidence)",
+]

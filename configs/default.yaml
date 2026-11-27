@@ -1,0 +1,125 @@
+# ClaimScan config root. Every path and model name the package uses comes from here.
+# Override the file with CLAIMSCAN_CONFIG=/path/to/other.yaml, or single values with the
+# env vars noted below.
+
+# Where the 147 GB of data / FAISS / verifier artifacts live. Env: CLAIMSCAN_ARTIFACTS
+artifacts_root: /mnt/d/crisis-claim-analysis/artifacts
+
+# HuggingFace cache (bge-small and deberta-v3-base are already downloaded here).
+# Only applied if HF_HOME is not already set. Set to null to leave HF_HOME alone.
+hf_home: /mnt/d/huggingface_cache
+
+# Relative paths below are resolved against artifacts_root.
+paths:
+  data_processed: data/processed
+  retriever_index_dir: dense/faiss_bge_small_en_v1_5
+  verifier_output_dir: verifier/deberta_v1
+  verifier_training_data: verifier/deberta_v1/training_data.json/training_data.json
+  # MLflow 3.x refuses the old ./mlruns file store, and the SQLite DB works on D: (first open ~70 s).
+  mlflow_tracking_uri: mlflow/mlflow.db
+  mlflow_artifact_dir: mlflow/artifacts
+  eval_dir: eval
+
+retriever:
+  model: BAAI/bge-small-en-v1.5
+  index_file: faiss_index_full.bin    # all 253 shards (25.2M); faiss_index_175.bin = old 17.1M
+  docids_file: all_docids_full.csv
+  nprobe: 64
+  # Memory-map the index instead of loading it: ~0.85 GB RAM instead of 26 GB.
+  # First query ~25 s (page cache warm-up), then ~0.1 s.
+  mmap: true
+  # Which retriever load_services() builds: faiss | bm25 | hybrid  (evidence scoring uses each
+  # hit's rank, not its score, so the bm25/faiss score directions don't matter there).
+  # Shipped default: hybrid = FAISS + BM25 without RM3 ("hybrid_norm3" in the benchmark; 300 claims, k=30:
+  # label acc 0.51, FEVER 0.38, best evidence recall/F1, ~2.2 s/claim). Run 20261124-220309.
+  kind: hybrid
+
+# Sentence-level BM25 (pyserini/Lucene) over the full 25.2M-sentence corpus.
+# Build: python -m claimscan.retrieval.bm25_index   (jsonl/ ~5 GB + index/ ~5 GB under dir)
+bm25:
+  dir: sparse/bm25_sentences
+  k1: 1.2
+  b: 0.4
+  # RM3 query expansion off ("bm25_norm3"): better on FEVER (acc 0.543 vs 0.537, FEVER 0.377 vs 0.337 at k=30)
+  # and ~17x faster cold (~0.43 s vs ~7 s/query). true needs the index built with docvectors (the builder does).
+  rm3: false
+
+# Reciprocal rank fusion of FAISS + BM25: score = sum over retrievers of 1 / (rrf_k + rank)
+hybrid:
+  rrf_k: 60
+  candidates: 100      # hits taken from each retriever before fusing
+
+# Reranker over the retrieved candidates, in pipeline.fact_check_detailed (API + fever_eval): retrieve `candidates`,
+# rerank, keep the top min(k, top_n). Fails open to retriever order if the call errors (e.g. no API key).
+# backend: none | cross_encoder | cohere | openai
+#   cohere needs env COHERE_API_KEY; openai needs OPENAI_API_KEY (or point openai_base_url at a local chat server);
+#   Notes: notes/reranker_research.md
+rerank:
+  backend: cohere           # key: COHERE_API_KEY in the repo-root .env (loaded by scripts/env.sh)
+  top_n: 10                 # sentences kept after reranking
+  candidates: 100           # retrieved hits fed to the reranker
+  batch_size: 32            # cross_encoder batch / openai parallel requests
+  device: cpu               # cross_encoder only
+  cross_encoder_model: BAAI/bge-reranker-v2-m3   # 568M; was cross-encoder/ms-marco-MiniLM-L-6-v2
+  cohere_model: rerank-v3.5
+  cohere_base_url: https://api.cohere.com
+  openai_model: gpt-5-nano
+  openai_base_url: https://api.openai.com/v1   # or http://localhost:8080/v1 for llama.cpp
+  openai_mode: pointwise    # pointwise | listwise
+
+# Rear aggregator: an LLM (Gemma GGUF on llama-server) reads the verifier's verdict + evidence and may
+# veto it, which only turns TRUE/FALSE into NOT ENOUGH INFO (claimscan/aggregation.py). Veto power is OFF
+# (rear_aggregator.VETO_ENABLED = False, 2026-11-26: it cut FEVER-suite accuracy 0.65 -> 0.46), so it only explains.
+# With it on, the gate in rear_aggregator.final_label applies a veto only if verifier conf < 0.6 OR llm_confidence >= 0.9. API only; the
+# benchmark never uses it. Fails open: if the server is down the verifier's verdict is returned.
+# Env: CLAIMSCAN_AGGREGATOR_ENABLED (1/0), CLAIMSCAN_AGGREGATOR_URL, CLAIMSCAN_AGGREGATOR_MODEL,
+#      CLAIMSCAN_AGGREGATOR_TIMEOUT, CLAIMSCAN_AGGREGATOR_API_KEY_ENV
+# Local llama-server: its port comes from the aggregator role in llamacpp/roles.yaml (CLAIMSCAN_AGGREGATOR_URL overrides it).
+# Together AI instead of llama-server (setting api_key_env switches to ChatTogether):
+#   model: meta-llama/Llama-3.3-70B-Instruct-Turbo   # any Together model id
+#   api_key_env: TOGETHER_API_KEY      # the key itself stays in that env var, never in this file
+aggregator:
+  enabled: false
+  model: gemma                         # llama-server serves one model and ignores the name; hosted APIs need a real one
+  api_key_env: ""                      # NAME of the env var holding the API key; "" = local llama-server (no key)
+  timeout: 30                          # seconds per request; no retries
+
+# Every dense FAISS index under artifacts_root/dense. faiss_embeddings.py and faiss_indexer.py
+# build any of them with --index <name>; the retriever above uses bge_small.
+# State on D: (2026-11-11): bge_small and minilm have 253 shards + faiss_index_175.bin;
+# e5_base has shards 1-56 only (shard 0 missing, no index built).
+dense_indexes:
+  bge_small:
+    model: BAAI/bge-small-en-v1.5
+    dir: dense/faiss_bge_small_en_v1_5
+    dim: 384
+  minilm:
+    model: sentence-transformers/all-MiniLM-L6-v2
+    dir: dense/faiss_all_minilm_l6_v2
+    dim: 384
+  e5_base:
+    model: intfloat/e5-base-v2
+    dir: dense/faiss_e5_base_v2
+    dim: 768
+default_dense_index: bge_small
+
+verifier:
+  model: microsoft/deberta-v3-base
+  # Verifier the pipeline / API / benchmark use: "ours" (verifier_output_dir/trained_model/model.pt)
+  # or a HuggingFace NLI model, e.g. MoritzLaurer/DeBERTa-v3-base-mnli-fever-anli (claimscan/verifier/hf_nli.py)
+  inference_model: MoritzLaurer/DeBERTa-v3-base-mnli-fever-anli
+  # TRUE/FALSE -> NOT ENOUGH INFO when the verifier's P(NEI) >= this (null = off). 0.2 chosen 2026-11-26 on the
+  # FEVER suite's 300 claims: label acc 0.650 -> 0.670 (NEI right 28% -> 39%, TRUE 91 -> 90%, FALSE 76 -> 72%).
+  nei_prob_threshold: 0.2
+  batch_size: 8
+  learning_rate: 2.0e-5
+  num_epochs: 3
+  max_length: 512
+  warmup_steps: 500
+  negative_samples_per_claim: 1
+  max_evidence_sentences: 3
+  eval_batch_size: 32
+  num_labels: 3
+
+mlflow_experiment_name: fever_verifier
+mlflow_retriever_experiment: retriever_eval
