@@ -33,6 +33,9 @@ httpx>=0.28                     # Cohere / OpenAI rerank backends (rerank.backen
 pydantic>=2.14,<3
 pyyaml>=6.0
 
+# --- natural-logic verifier (claimscan/neurosymbolic_layer/natlog/spans.py; model: requirements-dev.txt)
+spacy>=3.8
+
 # --- rear aggregator (optional, OFF by default: aggregator.enabled / CLAIMSCAN_AGGREGATOR_ENABLED).
 # ChatOpenAI talks to llama-server's OpenAI-compatible /v1. Imported lazily, so the API runs without them.
 langchain-core>=1.8,<2
