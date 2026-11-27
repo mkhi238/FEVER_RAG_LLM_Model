@@ -40,11 +40,23 @@ TRANSITIONS: dict[State, dict[Op, State]] = {
 }
 
 
-def run(ops: list[Op]) -> State:
-  """Walk the table from SUPPORT. An empty proof says nothing, so it is NEI."""
+def run(ops: list[Op], table: dict[State, dict[Op, State]] | None = None) -> State:
+  """Walk the table (default TRANSITIONS) from SUPPORT. An empty proof says nothing, so it is NEI."""
   if not ops:
     return N
+  table = table or TRANSITIONS
   state = S
   for op in ops:
-    state = TRANSITIONS[state][Op(op)]
+    state = table[state][Op(op)]
   return state
+
+
+def table_with(forward_supports: bool = True) -> dict[State, dict[Op, State]]:
+  """TRANSITIONS, or a copy where SUPPORT + ⊑ goes to NEI: a more specific evidence span ("American fantasy writer")
+  then no longer supports a more general claim span ("fantasy writer"). An open design question (docs/NATLOG_FOL.md);
+  natlog.forward_supports in default.yaml, default true (the published table)."""
+  if forward_supports:
+    return TRANSITIONS
+  t = {s: dict(row) for s, row in TRANSITIONS.items()}
+  t[S][Op.FORWARD] = N
+  return t

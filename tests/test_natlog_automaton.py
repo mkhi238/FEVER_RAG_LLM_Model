@@ -31,3 +31,12 @@ def test_table_is_complete_and_accepts_symbols():
   assert all(set(row) == set(Op) for row in TRANSITIONS.values())
   assert run(["≡", "¬"]) == State.REFUTE            # operators may come in as their symbols
   assert State.SUPPORT.value == "TRUE"               # same label names as the pipeline
+
+
+def test_table_with_forward_supports():
+  from claimscan.neurosymbolic_layer.natlog.automaton import TRANSITIONS, table_with
+  assert table_with(True) is TRANSITIONS
+  strict = table_with(False)
+  assert run([Op.EQUIVALENCE, Op.FORWARD]) == State.SUPPORT
+  assert run([Op.EQUIVALENCE, Op.FORWARD], strict) == State.NEI
+  assert TRANSITIONS[State.SUPPORT][Op.FORWARD] == State.SUPPORT     # the published table is untouched
