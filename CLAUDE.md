@@ -5,7 +5,7 @@ A FEVER fact-checker (FAISS bge-small retrieval → heuristic evidence scoring �
 being turned into **ClaimScan (RAG + RL)**. Plan PDF: `claimscan-plan-summary.pdf` in the repo root (untracked, not committed; dated Oct 12, 2026, so some parts are stale).
 The plan: front facer → LangGraph per-claim loop (decomposer = research agent, one local Qwen3-4B on llama.cpp:
 splits claims, writes queries, decides search-again/stop → retrieve → rerank → DeBERTa verify, max 3 hops; decided
-2026-11-25). Only that Qwen3-4B gets trained (LoRA SFT, then GRPO after Dec 22). The verifier is frozen and used as the reward. Branch `refactor` = setup/cleanup only; no plan features are built yet.
+2026-11-25). Only that Qwen3-4B gets trained (LoRA SFT, then GRPO after Dec 22). The verifier is frozen and used as the reward. Branches (2026-11-27): `main` = shipped; `ship` (GitHub only, PR to main: README, /readme skill, docs/architecture LaTeX); `overhaul` = main checkout (cleanup + new plan, `docs/OVERHAUL.md`); `natlog` = natural-logic layer, worktree `../FEVER_RAG_LLM_Model-natlog`. `refactor` was deleted 2026-11-27 (all its commits are in `overhaul`).
 
 ## Storage rule (hard): nothing on C:
 - Repo: `/mnt/d/FEVER_RAG_LLM_Model` (the WSL home `~` is a disk image ON C:, so never put project files under `~`)
@@ -36,7 +36,7 @@ python -m pytest -q             # slow: D: is WSL drvfs
 - Publishing: only working end-to-end parts go to `main` (merged from a separate `ship` branch built in its own worktree,
   never by switching branches in the shared checkout). Shipped 2026-11-25: API + SQLite store + Docker, hybrid retriever,
   rear aggregator (`aggregation.py`, `instruct/{schemas,chat_clients,rear_aggregator}.py`, off by default, fails open), graph, `.claude/`.
-  Shipped 2026-11-26: Cohere reranker, full FAISS index. Still `refactor`-only: agents, llm, serve, `instruct/{front_decomposer,prompts}.py`, most of `llamacpp/`, `scripts/e2e_cpu_eval.py`.
+  Shipped 2026-11-26: Cohere reranker, full FAISS index. Still `overhaul`-only (not shipped): agents, llm, serve, `instruct/{front_decomposer,prompts}.py`, most of `llamacpp/`, `scripts/e2e_cpu_eval.py`.
 - Shipped retriever default: `retriever.kind: hybrid` with `bm25.rm3: false` (benchmark name `hybrid_norm3`). 300 claims, k=30:
   label acc 0.64, FEVER 0.48 (with the ready-made verifier, 2026-11-25; 0.51 / 0.38 with the old deberta_v1). The FEVER claim suite (`/fever-full-test` for 10 claims, `/fever-full-test 300` for the full numbers) checks it per claim. The user's reference number is
   64.5% (an N=30 trial, not saved); the recall/testing method is being redone.
