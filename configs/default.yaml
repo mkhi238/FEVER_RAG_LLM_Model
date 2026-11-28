@@ -22,12 +22,15 @@ paths:
 
 retriever:
   model: BAAI/bge-small-en-v1.5
-  index_file: faiss_index_full.bin    # all 253 shards (25.2M); faiss_index_175.bin = old 17.1M
+  # Default (2026-11-27): faiss_index_pq96.bin = IVF-PQ, 96 bytes/vector, all 25.2M, 2.63 GB in RAM, ~43 ms/query
+  # (claimscan/retrieval/faiss_pq.py). 200 FEVER claims, recall@k vs the full index: R@10 0.505 vs 0.510, R@50 0.620 vs 0.640.
+  # faiss_index_full.bin (+ 39 GB .ivfdata) = exact, on disk, 30-110 s cold per query; set mmap: true with it.
+  # faiss_index_pq.bin = 48 bytes, 1.42 GB, 22 ms, R@10 0.460. faiss_index_175.bin = old 17.1M.
+  index_file: faiss_index_pq96.bin
   docids_file: all_docids_full.csv
   nprobe: 64
-  # Memory-map the index instead of loading it: ~0.85 GB RAM instead of 26 GB.
-  # First query ~25 s (page cache warm-up), then ~0.1 s.
-  mmap: true
+  # mmap: memory-map the index instead of loading it (for the big IVF-Flat files). The PQ index is loaded into RAM.
+  mmap: false
   # Which retriever load_services() builds: faiss | bm25 | hybrid  (evidence scoring uses each
   # hit's rank, not its score, so the bm25/faiss score directions don't matter there).
   # Shipped default: hybrid = FAISS + BM25 without RM3 ("hybrid_norm3" in the benchmark; 300 claims, k=30:

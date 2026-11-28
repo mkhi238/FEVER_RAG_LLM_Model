@@ -90,6 +90,9 @@ python -m pytest -q             # slow: D: is WSL drvfs
   old `deberta_v1` verifier was trained on data from before the fix.
 - FAISS: `faiss_index_full.bin` + `.ivfdata` (on-disk, 39 GB) has all 253 shards (25.2M), built 2026-11-26 by
   `retrieval/faiss_extend.py` from the old `faiss_index_175.bin` (17.1M, shards 4–174), which is kept.
+  DEFAULT since 2026-11-27 (overhaul): `faiss_index_pq96.bin`, IVF-PQ 96 bytes/vector (`retrieval/faiss_pq.py`, same 4096
+  centroids + docid list), 2.63 GB in RAM, ~43 ms/query vs 30-110 s cold. 200 FEVER claims: R@10 0.505 / R@50 0.620 vs full
+  0.510 / 0.640 (48-byte `faiss_index_pq.bin`: 0.460 / 0.590). Built for the RL librarian. `faiss_batch.batch_search` handles both.
 - The old verifier's 94–95% figure came from the old split: its validation set was all 1,500 NEI examples, so TRUE/FALSE was never checked.
 - The llama.cpp CUDA build is blocked: CUDA 12.4 nvcc needs gcc ≤ 13, and WSL has gcc 15 (options in `llamacpp/README.md`).
 - The big front-facer MoE won't fit in 15 GB RAM, so route front_facer to a hosted API (`llamacpp/roles.yaml`). The decomposer is now the local Qwen3-4B

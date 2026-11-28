@@ -181,6 +181,16 @@ class DocIds:
     return {norm_title(p) for p in uniq.to_pylist()}
 
 
+def _is_ivf_flat(path) -> bool:
+  """True for the IVF-Flat indexes IVFListScanner reads (on-disk .ivfdata or a plain file); False for IVF-PQ."""
+  path = Path(path)
+  if path.with_suffix(".ivfdata").exists():
+    return True
+  import faiss
+  index = faiss.read_index(str(path), faiss.IO_FLAG_MMAP)
+  return isinstance(faiss.downcast_index(faiss.extract_index_ivf(index)), faiss.IndexIVFFlat)
+
+
 def batch_search(queries, index_dir, model_name, index_file, docids_file, nprobe=64, k=100,
                  encode_batch_size=64):
   """Encode ``queries`` like FAISSRetriever.encode_query and search them with IVFListScanner.
@@ -200,14 +210,24 @@ def batch_search(queries, index_dir, model_name, index_file, docids_file, nprobe
   del model
 
   t1 = time.perf_counter()
-  scanner = IVFListScanner(index_dir / index_file, nprobe=nprobe)
-  D, I = scanner.search(xq, k)
+  path = index_dir / index_file
+  if _is_ivf_flat(path):
+    scanner = IVFListScanner(path, nprobe=nprobe)
+    D, I = scanner.search(xq, k)
+    ntotal = scanner.ntotal
+  else:   # a compressed in-RAM index (faiss_pq.py, IVF-PQ): load it and search directly, it is fast
+    import faiss
+    index = faiss.read_index(str(path))
+    faiss.extract_index_ivf(index).nprobe = nprobe
+    D, I = index.search(xq, k)
+    ntotal = index.ntotal
+    del index
   t_scan = time.perf_counter() - t1
 
   t2 = time.perf_counter()
   docids = DocIds(index_dir / docids_file)
-  if len(docids) != scanner.ntotal:
-    raise ValueError(f"Mismatch: {len(docids)} docids vs {scanner.ntotal} vectors in index")
+  if len(docids) != ntotal:
+    raise ValueError(f"Mismatch: {len(docids)} docids vs {ntotal} vectors in index")
   hits = []
   for drow, irow in zip(D, I):
     keep = irow >= 0
